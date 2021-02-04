@@ -1,0 +1,121 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0702 Canteen</title>
+   <description>HRS TNG3 report 0702 Canteen</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="4"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[SELECT 
+    c.last_name||' '||c.first_name||' '||c.second_name as GuestName,
+    r.BUSSINES_DATE as BRegDate,
+    TO_CHAR(r.BUSSINES_DATE, 'DD.MM.YYYY') as RegDate, 
+    c.card_id,
+    c.MAGSTRIPE,
+    (case when rk.key_number is null then rk.key_code else  rk.key_number end) as key_code,
+    rk.key_number,
+    TO_CHAR(r.clockin, 'DD.MM.YYYY HH24:MI') as  RClockIn, 
+    TO_CHAR(r.clockout , 'DD.MM.YYYY HH24:MI') as RClockOut,
+    ct.type_name,
+    c.company,
+    c.job_title
+FROM cards c, registration r, registration_keys rk, card_types ct, rvc rv
+WHERE c.card_id = r.card_id
+    and r.reg_id=rk.reg_id(+)
+    and ct.card_type_id=c.card_type_id
+    and LOWER(c.last_name||' '||c.first_name||' '||c.second_name||'('||c.card_id||')') like LOWER(nvl('%'||:InGuesName||'%', c.last_name||' '||c.first_name||' '||c.second_name||'('||c.card_id||')'))
+    and c.card_id = nvl(:InIdCard,c.card_id )
+    and trunc(r.BUSSINES_DATE) between trunc(:dStart) and trunc(:dEnd)
+    and r.rvc_id=rv.rvc_id
+    AND (upper(c.COMPANY) LIKE upper(:company|| '%') or :company is null)
+    AND (upper(c.job_title) LIKE upper(:job_title|| '%')  or :job_title is null)
+    and rv.site_id in (:site_list) 
+    and ct.type_name in (:ctypes)]]>
+         </sql>
+         <input id="InGuesName" value="${InGuesName}" dataType="xsd:string"/>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+         <input id="company" value="${company}" dataType="xsd:string"/>
+         <input id="job_title" value="${job_title}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+         <input id="ctypes" value="${ctypes}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="ParamSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:dStart, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:dEnd, 'DD.MM.YYYY') as report_end,
+:InGuesName guestNameParam
+from dual]]>
+         </sql>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+         <input id="InGuesName" value="${InGuesName}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <ParamSet>
+                  <nodeList dataSet="ParamSet" select="/ROWSET/PARAMSET_ROW"/>
+               </ParamSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+      <valueSet id="ctype">
+         <sql>
+            <![CDATA[select type_name from card_types order by type_name]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="ctypes">
+         <select label="Card Type: " valueSet="ctype" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="dStart" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="dEnd" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="InGuesName">
+         <input label="Guest name:"/>
+      </parameter>
+      <parameter id="company">
+         <input label="Company:"/>
+      </parameter>
+      <parameter id="job_title">
+         <input label="Job:"/>
+      </parameter>
+   </parameters>
+   <templates default="canteenDetailedEn">
+      <template label="canteenDetailedEn" type="rtf" url="canteenDetailedEn.rtf"/>
+      <template label="canteenDetailedRu" type="rtf" url="canteenDetailedRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

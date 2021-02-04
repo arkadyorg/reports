@@ -1,0 +1,118 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0706 Revenue center discount cards type and revenue</title>
+   <description>HRS TNG3 report 0706 Revenue center discount cards type and revenue</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="5"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet1">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    d.CHKNUM as chknum,
+    d.tm as tm,
+    d.OPERATOR as operator,
+    r.name as rvcname,
+    r.rvc_id as rvc,
+    c.LAST_NAME||' '||c.FIRST_NAME as gname,
+    c.MAGSTRIPE as cardnum,
+    ct.TYPE_NAME,
+    dtl.si as si,
+    --(select splt.name from pos_split_dc splt where splt.RVC = (select r2.pos_rvc from rvc r2 where r2.rvc_id=r.rvc_id) and splt.SI = dtl.si) as siname,
+    dtl.TTL as chktotal,
+    sum(dtl.dsc + dtl.manual_dsc) as dsctotal,
+    sum(dtl.ttl - (dtl.dsc + dtl.manual_dsc)) as nettotal
+from docs d, docs_dtl dtl, cards c, rvc r, card_types ct
+where dtl.DOC_ID = d.DOC_ID
+    and d.CHECK_OPEN = 'F'
+    and d.COFIRMATION = 'T'
+    and c.CARD_ID = d.DEF_CARD_ID
+    and r.RVC_ID = d.RVC
+    and ct.CARD_TYPE_ID = c.CARD_TYPE_ID
+    and r.name in (:rvc)
+    and ct.type_name in (:ctype)
+    and trunc(d.tm) between trunc(:datefrom) and trunc(:dateto)
+    and r.site_id in (:site_list)
+group by d.CHKNUM, d.tm, d.OPERATOR, r.name, r.rvc_id, c.LAST_NAME||' '||c.FIRST_NAME, c.MAGSTRIPE, ct.TYPE_NAME, dtl.si, dtl.TTL]]>
+         </sql>
+         <input id="rvc" value="${rvc}" dataType="xsd:string"/>
+         <input id="ctype" value="${ctype}" dataType="xsd:string"/>
+         <input id="datefrom" value="${datefrom}" dataType="xsd:date"/>
+         <input id="dateto" value="${dateto}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datefrom) datar,
+(:dateto) daten
+from dual]]>
+         </sql>
+         <input id="datefrom" value="${datefrom}" dataType="xsd:date"/>
+         <input id="dateto" value="${dateto}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet1>
+                  <nodeList dataSet="DataSet1" select="/ROWSET/DATASET1_ROW"/>
+               </DataSet1>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name from rvc order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="ctype">
+         <sql>
+            <![CDATA[select type_name from card_types order by type_name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvc">
+         <select label="RVC" valueSet="rvc" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="ctype">
+         <select label="Card Type" valueSet="ctype" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="datefrom" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="dateto" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yy"/>
+      </parameter>
+   </parameters>
+   <templates default="RevenueCenterDiscBySI En">
+      <template label="RevenueCenterDiscBySI En" type="rtf" url="RevenueCenterDiscBySIEn.rtf"/>
+      <template label="RevenueCentersDiscBySISummary En" type="rtf" url="RevenueCenterDiscBySISumEn.rtf"/>
+      <template label="RevenueCenterDiscBySI Ru" type="rtf" url="RevenueCenterDiscBySIRu.rtf"/>
+      <template label="RevenueCentersDiscBySISummary Ru" type="rtf" url="RevenueCenterDiscBySISumRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

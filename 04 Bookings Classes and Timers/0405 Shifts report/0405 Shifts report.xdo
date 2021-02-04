@@ -1,0 +1,101 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0405 Shifts report</title>
+   <description>HRS TNG3 report 0405 Shifts report</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="data">
+      <dataSet id="data">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+(:startRange) startRange,
+(:endRange) endRange,
+  empl_id, 
+  employee_name,
+  min(clockin) as clockin,
+  max(clockout) as clockout,
+  clockin_d,
+  min(clockin_t) as clockin_t,
+  max(clockout_t) as clockout_t,
+  round((to_date(to_char(max(clockout), 'HH24:MI'), 'HH24:MI') - 
+      to_date(to_char(min(clockin), 'HH24:MI'), 'HH24:MI'))*24, 2) as hrs    
+from (
+select 
+  e.empl_id,
+  e.name2 || ' ' || e.name1 as employee_name,
+  rs.time_start as clockin,
+  rs.time_end as clockout,
+  to_char(rs.time_start, 'dd.mm') as clockin_d,
+  to_char(rs.time_start, 'hh24:mi') as clockin_t,
+  to_char(rs.time_end, 'hh24:mi') as  clockout_t
+from 
+  resource_schedule rs,
+  employees e
+where
+  rs.resource_id=e.empl_id   
+  and trunc(rs.TIME_START) between :startRange and :endRange
+  and rs.event_type='A'  
+  and (:empl is null or :empl=e.empl_id)
+
+order by
+  rs.TIME_START ASC
+)  
+group by 
+  empl_id, 
+  employee_name,
+  clockin_d
+order by clockin_d,employee_name]]>
+         </sql>
+         <input id="startRange" value="${startRange}" dataType="xsd:date"/>
+         <input id="endRange" value="${endRange}" dataType="xsd:date"/>
+         <input id="empl" value="${empl}" dataType="xsd:string"/>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="ctypes">
+         <sql>
+            <![CDATA[select type_name, card_type_id from card_types 
+order by type_name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="empl" cache="false">
+         <sql>
+            <![CDATA[select distinct
+  e.name2 || ' ' || e.name1 as employee_name,
+  e.empl_id
+from 
+  resource_schedule rs,
+  employees e
+where
+  rs.resource_id=e.empl_id   
+  and rs.event_type='A'  
+order by
+  e.name2 || ' ' || e.name1]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="startRange" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="endRange" defaultValue="{$LAST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="empl">
+         <select label="Employee: " valueSet="empl" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="ShiftsEn">
+      <template label="ShiftsEn" type="rtf" url="ShiftsEn.rtf"/>
+      <template label="ShiftsRu" type="rtf" url="ShiftsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

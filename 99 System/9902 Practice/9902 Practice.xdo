@@ -1,0 +1,305 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>9902 Practice</title>
+   <description>HRS TNG3 9902 Practice</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+'Кабинет 1 '||randomtype.type fac1,
+'Кабинет 2 '||randomtype.type fac2,
+'Кабинет 3 '||randomtype.type fac3,
+wspec.wfname||' '||wspec.wlname wspec,
+mspec1.mfname||' '||mspec1.mlname mspec1,
+mspec2.mfname||' '||mspec2.mlname mspec2,
+'Каб. '||randomtype.type facskill,
+'Спец. '||randomtype.type specskill,
+randomtype.type||' 30 мин' min30,
+randomtype.type||' 60 мин' min60,
+randomtype.type||' 90 мин' min90,
+tst.name tersched,
+fst.name fasched,
+trunc(sysdate) today,
+trunc(sysdate+1) tomorrow,
+trunc(sysdate+(round(dbms_random.value(1,15)))) otherday,
+randguest.guest,
+tm1.tmname tm1,
+tm2.tmname tm2,
+tm3.tmname tm3,
+ch2itms.itemname,
+ch2itms.dscval
+from 
+(SELECT
+       CASE round(dbms_random.value(1,15)) 
+            WHEN 1 THEN 'Классический' 
+            WHEN 2 THEN 'Лечебный' 
+            WHEN 3 THEN 'Расслабляющий' 
+            WHEN 4 THEN 'Тибетский' 
+            WHEN 5 THEN 'Хиромассаж' 
+            WHEN 6 THEN 'Стоунтерапия' 
+            WHEN 7 THEN 'Тайский расслабляющий' 
+            WHEN 8 THEN 'Тайский'
+            WHEN 9 THEN 'Косметический' 
+            WHEN 10 THEN 'Аппаратный'
+            WHEN 11 THEN 'Ломи-ломи'
+            WHEN 12 THEN 'Турецкий'
+            WHEN 13 THEN 'Широдхара'
+            WHEN 14 THEN 'Эсален-массаж'
+            WHEN 15 THEN 'Рейки'
+       END AS type
+FROM dual) randomtype,
+
+
+(Select
+wfname.wfname,
+wlname.wlname
+from
+(
+SELECT
+       CASE round(dbms_random.value(1,15)) 
+            WHEN 1 THEN 'Анастасия' 
+            WHEN 2 THEN 'Анна' 
+            WHEN 3 THEN 'Мария' 
+            WHEN 4 THEN 'Елена' 
+            WHEN 5 THEN 'Дарья' 
+            WHEN 6 THEN 'Алина' 
+            WHEN 7 THEN 'Ирина' 
+            WHEN 8 THEN 'Екатерина'
+            WHEN 9 THEN 'Арина' 
+            WHEN 10 THEN 'Полина'
+            WHEN 11 THEN 'Ольга'
+            WHEN 12 THEN 'Юлия'
+            WHEN 13 THEN 'Татьяна'
+            WHEN 14 THEN 'Наталья'
+            WHEN 15 THEN 'Виктория'
+       END AS wfname
+FROM dual) wfname,
+(
+
+SELECT
+       CASE round(dbms_random.value(1,15)) 
+            WHEN 1 THEN 'Ковалёва' 
+            WHEN 2 THEN 'Ильина' 
+            WHEN 3 THEN 'Гусева' 
+            WHEN 4 THEN 'Титова' 
+            WHEN 5 THEN 'Кузьмина' 
+            WHEN 6 THEN 'Кудрявцева' 
+            WHEN 7 THEN 'Баранова' 
+            WHEN 8 THEN 'Куликова'
+            WHEN 9 THEN 'Алексеева' 
+            WHEN 10 THEN 'Степанова'
+            WHEN 11 THEN 'Яковалева'
+            WHEN 12 THEN 'Сорокина'
+            WHEN 13 THEN 'Сергеева'
+            WHEN 14 THEN 'Романова'
+            WHEN 15 THEN 'Захарова'
+       END AS wlname
+FROM dual) wlname) wspec,
+
+(Select
+mfname.mfname,
+mlname.mlname
+from
+(
+SELECT
+       CASE round(dbms_random.value(1,15)) 
+            WHEN 1 THEN 'Денис' 
+            WHEN 2 THEN 'Тимофей' 
+            WHEN 3 THEN 'Ярослав' 
+            WHEN 4 THEN 'Сергей' 
+            WHEN 5 THEN 'Роман' 
+            WHEN 6 THEN 'Алексей' 
+            WHEN 7 THEN 'Илья' 
+            WHEN 8 THEN 'Андрей'
+            WHEN 9 THEN 'Владимир' 
+            WHEN 10 THEN 'Кирилл'
+            WHEN 11 THEN 'Александр'
+            WHEN 12 THEN 'Артем'
+            WHEN 13 THEN 'Максим'
+            WHEN 14 THEN 'Данила'
+            WHEN 15 THEN 'Дмитрий'
+       END AS mfname
+FROM dual) mfname,
+(
+
+SELECT
+       CASE round(dbms_random.value(1,15)) 
+            WHEN 1 THEN 'Иванов' 
+            WHEN 2 THEN 'Смирнов' 
+            WHEN 3 THEN 'Кузнецов' 
+            WHEN 4 THEN 'Попов' 
+            WHEN 5 THEN 'Васильев' 
+            WHEN 6 THEN 'Петров' 
+            WHEN 7 THEN 'Соколов' 
+            WHEN 8 THEN 'Михайлов'
+            WHEN 9 THEN 'Новиков' 
+            WHEN 10 THEN 'Федоров'
+            WHEN 11 THEN 'Морозов'
+            WHEN 12 THEN 'Волков'
+            WHEN 13 THEN 'Алексеев'
+            WHEN 14 THEN 'Лебедев'
+            WHEN 15 THEN 'Семенов'
+       END AS mlname
+FROM dual) mlname) mspec1,
+
+(Select
+mfname.mfname,
+mlname.mlname
+from
+(
+SELECT
+       CASE round(dbms_random.value(1,15)) 
+            WHEN 1 THEN 'Денис' 
+            WHEN 2 THEN 'Тимофей' 
+            WHEN 3 THEN 'Ярослав' 
+            WHEN 4 THEN 'Сергей' 
+            WHEN 5 THEN 'Роман' 
+            WHEN 6 THEN 'Алексей' 
+            WHEN 7 THEN 'Илья' 
+            WHEN 8 THEN 'Андрей'
+            WHEN 9 THEN 'Владимир' 
+            WHEN 10 THEN 'Кирилл'
+            WHEN 11 THEN 'Александр'
+            WHEN 12 THEN 'Артем'
+            WHEN 13 THEN 'Максим'
+            WHEN 14 THEN 'Данила'
+            WHEN 15 THEN 'Дмитрий'
+       END AS mfname
+FROM dual) mfname,
+(
+
+SELECT
+       CASE round(dbms_random.value(1,15)) 
+            WHEN 1 THEN 'Иванов' 
+            WHEN 2 THEN 'Смирнов' 
+            WHEN 3 THEN 'Кузнецов' 
+            WHEN 4 THEN 'Попов' 
+            WHEN 5 THEN 'Васильев' 
+            WHEN 6 THEN 'Петров' 
+            WHEN 7 THEN 'Соколов' 
+            WHEN 8 THEN 'Михайлов'
+            WHEN 9 THEN 'Новиков' 
+            WHEN 10 THEN 'Федоров'
+            WHEN 11 THEN 'Морозов'
+            WHEN 12 THEN 'Волков'
+            WHEN 13 THEN 'Алексеев'
+            WHEN 14 THEN 'Лебедев'
+            WHEN 15 THEN 'Семенов'
+       END AS mlname
+FROM dual) mlname) mspec2,
+
+(SELECT 
+	tsched.name
+	FROM   (
+	select
+			rp.name,
+			sum(1) weight
+		from resman_preset_dtl rpd, resman_preset rp
+		where rpd.RESMAN_PRESET_ID=rp.RESMAN_PRESET_ID
+		and rpd.RESOURCE_TYPE='T'
+		group by
+		rp.name
+	  ORDER BY DBMS_RANDOM.VALUE
+	    ) tsched
+WHERE  rownum =1)tst,
+
+(SELECT 
+	tsched.name
+	FROM   (
+	select
+			rp.name,
+			sum(1) weight
+		from resman_preset_dtl rpd, resman_preset rp
+		where rpd.RESMAN_PRESET_ID=rp.RESMAN_PRESET_ID
+		and rpd.RESOURCE_TYPE='F'
+		group by
+		rp.name
+	  ORDER BY DBMS_RANDOM.VALUE
+	    ) tsched
+WHERE  rownum =1)fst,
+
+(
+SELECT 
+'('||c.card_id||') '||c.last_name||' '||c.first_name||' '||c.second_name guest
+FROM   (
+    SELECT *
+    FROM   cards
+    ORDER BY DBMS_RANDOM.VALUE) c
+WHERE  rownum = 1
+) randguest,
+
+(SELECT 
+tm.name tmname
+FROM   (
+    SELECT *
+    FROM   tendermedia
+    ORDER BY DBMS_RANDOM.VALUE) tm
+WHERE  rownum = 1) tm1,
+
+(SELECT 
+tm.name tmname
+FROM   (
+    SELECT *
+    FROM   tendermedia
+    ORDER BY DBMS_RANDOM.VALUE) tm
+WHERE  rownum = 1) tm2,
+
+(SELECT 
+tm.name tmname
+FROM   (
+    SELECT *
+    FROM   tendermedia
+    ORDER BY DBMS_RANDOM.VALUE) tm
+WHERE  rownum = 1) tm3,
+
+(SELECT 
+	ch2mi.itemname,
+	ch2mi.dscval
+FROM   (
+    SELECT mi.name1 itemname,
+    round(dbms_random.value(1,29)) *3 dscval
+    FROM   menu_items mi where mi.mi_type=7
+    ORDER BY DBMS_RANDOM.VALUE) ch2mi
+WHERE  rownum < 4)ch2itms]]>
+         </sql>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date"/>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date"/>
+   </parameters>
+   <templates default="practiceRu">
+      <template label="practiceRu" type="rtf" url="practiceEn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

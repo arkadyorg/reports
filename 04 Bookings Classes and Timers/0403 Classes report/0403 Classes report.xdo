@@ -1,0 +1,63 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0403 Classes report</title>
+   <description>HRS TNG3 report 0403 Classes report</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="Dataset">
+      <dataSet id="Dataset">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+  :date_from as report_start,
+  :date_to as report_end,
+  rvc.rvc_id, 
+  rvc.name,
+  to_char(bs.time_start, 'dd.MM.yyyy') as date_start,
+  to_char(bs.time_start, 'hh:mi:ss') as time_start, 
+  to_char(bs.time_end, 'hh:mi:ss') as time_end, 
+  (select br1.resource_name from booking_resources br1 where br1.booking_id = bs.parent_booking_id and br1.resource_type = 'F') as cabinet,
+  bs.name as training_name,
+  (select emp1.empl_id from booking_resources br1, employees emp1 where br1.booking_id = bs.parent_booking_id and br1.resource_type = 'T' and br1.resource_id = emp1.empl_id(+)) as trainer_id,
+  (select emp1.name2 || ' ' || emp1.name1 from booking_resources br1, employees emp1 where br1.booking_id = bs.parent_booking_id and br1.resource_type = 'T' and br1.resource_id = emp1.empl_id(+)) as trainer_name,
+  
+  ca.card_id,
+  (ca.last_name || ' ' || substr(ca.first_name, 1, 1) || '.' || substr(ca.second_name, 1, 1) || '.') as card_full_name   
+from 
+  bookings bs, booking_resources br, cards ca, rvc
+where  
+  br.booking_id = bs.booking_id
+  and to_date(to_char(bs.time_start, 'dd.MM.yyyy'), 'dd.MM.yyyy') between :date_from and :date_to
+  --and bs.status = 'C'
+  and ca.card_id = br.resource_id
+  and bs.parent_booking_id is not null
+  and rvc.rvc_id = bs.rvc_id
+order by
+  rvc.rvc_id, bs.time_start, bs.parent_booking_id]]>
+         </sql>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="date_from" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="date_to" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="ClassesEn">
+      <template label="ClassesEn" type="rtf" url="ClassesEn.rtf"/>
+      <template label="ClassesRu" type="rtf" url="ClassesRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

@@ -1,0 +1,107 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0708 Client preference analysis</title>
+   <description>HRS TNG3 report 0708 Client preference analysis</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	dd.MI_ID,
+	dd.COUNT,
+	dd.NAME itemname,
+	dd.ttl,
+	d.BUSSINES_DATE,
+	d.rvc,
+	r.name rvcname,
+	d.DEF_CARD_ID,
+	c.last_name||' '||c.FIRST_NAME fio
+
+from DOCS_DTL dd, docs d, rvc r, cards c
+
+where dd.VOID_FLAG is null
+	and dd.doc_id = d.doc_id
+	and d.COFIRMATION = 'T'
+	and d.CHECK_OPEN = 'F'
+	and d.rvc = r.RVC_ID
+	and d.DEF_CARD_ID = c.CARD_ID
+	and d.DEF_CARD_ID = (:cid)
+	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten)
+	and upper(dd.name) like upper('%'||:miname||'%')
+    and r.site_id in (:site_list)]]>
+         </sql>
+         <input id="cid" value="${cid}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="miname" value="${miname}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+(:cid) clientid,
+(:miname) miname
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="cid" value="${cid}" dataType="xsd:string"/>
+         <input id="miname" value="${miname}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="cid">
+         <input label="Card ID:"/>
+      </parameter>
+      <parameter id="miname">
+         <input label="Menu Item name:"/>
+      </parameter>
+   </parameters>
+   <templates default="Client preference En">
+      <template label="Client preference En" type="rtf" url="clientPreferenceEn.rtf"/>
+      <template label="Client preference Ru" type="rtf" url="clientPreferenceRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

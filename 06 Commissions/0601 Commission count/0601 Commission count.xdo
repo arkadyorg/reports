@@ -1,0 +1,196 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0601 Commission count</title>
+   <description>HRS TNG3 report 0601 Commission count</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+--(select listagg(to_char(name1||' '||name2), ',') within group (order by name1||' '||name2)  from employees where name1||' '||name2 in (:emp)) hemplist,
+nvl((select name from rvc where rvc_id = (:rvcid)),'All') rvc
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="emp" value="${emp}" dataType="xsd:string"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    dd.doc_id,
+    dd.DTL_SEQ,
+    dd.name,
+    dd.count,
+    dd.ttl-dd.dsc+dd.pay_ttl_subscr TTL,
+    dd.dsc,
+    --dd.si,
+    ms.name SINAME,
+    --dd.fgrp,
+    mf.name FGRPname,
+    --dd.COMISSION_EMPL_ID,
+    ce.name1||' '||ce.NAME2 comissionempl,
+    --dd.POSTING_EMPL_ID,
+    dd.DSC_REASON,
+    d.tm TM,
+    d.bussines_date,
+    --d.rvc,
+    r.name rvcname,
+    d.CHKNUM,
+    d.operator,
+    --d.def_card_id,
+    c.LAST_NAME||' '||c.FIRST_NAME||' '||c.SECOND_NAME FIO,
+    --d.DEF_CARD_TYPE_ID
+    ct.type_name,
+    LISTAGG(to_char(dp.tm_name), ', ') WITHIN GROUP (ORDER BY dp.tm_name) paymethod
+
+from docs_dtl dd, 
+    docs d, 
+    menu_si ms, 
+    menu_FGRp mf, 
+    employees ce, 
+    rvc r, 
+    cards c, 
+    card_types ct, 
+    docs_paym dp
+
+where d.doc_id=dd.doc_id
+    and dd.si=ms.SI_ID
+    and dd.fgrp=mf.FGRP_ID
+    and dd.COMISSION_EMPL_ID=ce.EMPL_ID
+    and d.rvc=r.rvc_id
+    and d.def_card_id=c.card_id
+    and d.DEF_CARD_TYPE_ID=ct.CARD_TYPE_ID
+    and dd.doc_id=dp.doc_id(+)
+    and d.cofirmation='T'
+    and d.CHECK_OPEN='F'
+    and dd.void_flag is null
+    and (:si_id is null or dd.si=:si_id)
+    and (:fgrp_id is null or dd.fgrp=:fgrp_id)
+    and ((ce.name1||' '||ce.NAME2) in (:emp))
+    and trunc(d.TM) between trunc(:datar) and trunc(:daten)
+    and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+    and dp.tm_id in (:tendermedia)
+
+group by
+    dd.doc_id,
+    dd.DTL_SEQ,
+    dd.name,
+    dd.count,
+    dd.ttl-dd.dsc+dd.pay_ttl_subscr,
+    dd.dsc,
+    --dd.si,
+    ms.name ,
+    --dd.fgrp,
+    mf.name ,
+    --dd.COMISSION_EMPL_ID,
+    ce.name1||' '||ce.NAME2 ,
+    --dd.POSTING_EMPL_ID,
+    dd.DSC_REASON,
+    d.tm ,
+    d.bussines_date,
+    --d.rvc,
+    r.name ,
+    d.CHKNUM,
+    d.operator,
+    --d.def_card_id,
+    c.LAST_NAME||' '||c.FIRST_NAME||' '||c.SECOND_NAME ,
+    --d.DEF_CARD_TYPE_ID
+    ct.type_name]]>
+         </sql>
+         <input id="si_id" value="${si_id}" dataType="xsd:integer"/>
+         <input id="fgrp_id" value="${fgrp_id}" dataType="xsd:integer"/>
+         <input id="emp" value="${emp}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+         <input id="tendermedia" value="${tendermedia}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="employees">
+         <sql>
+            <![CDATA[select distinct e.name1||' '||e.name2
+from docs_dtl dd, employees e
+where dd.COMISSION_EMPL_ID is not null
+and dd.COMISSION_EMPL_ID=e.EMPL_ID]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="GRPs">
+         <sql>
+            <![CDATA[select si_id|| ' - '|| name, si_id from menu_si order by si_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="FGRPs">
+         <sql>
+            <![CDATA[select fgrp_id|| ' - '||name , fgrp_id  from menu_fgrp order by fgrp_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="tmlist">
+         <sql>
+            <![CDATA[select distinct
+dp.tm_name,
+dp.tm_id
+from docs_paym dp]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="emp">
+         <select label="Employee: " valueSet="employees" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvcid" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvc" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="si_id" dataType="xsd:integer">
+         <select label="Sales group: " valueSet="GRPs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="fgrp_id" dataType="xsd:integer">
+         <select label="Family group: " valueSet="FGRPs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="tendermedia">
+         <select label="Payment method: " valueSet="tmlist" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="CommissionsEN">
+      <template label="CommissionsEN" type="rtf" url="CommissionsEn.rtf"/>
+      <template label="CommissionsRU" type="rtf" url="CommissionsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

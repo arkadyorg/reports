@@ -1,0 +1,98 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0402 Booking list</title>
+   <description>HRS TNG3 report 0402 Booking list</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="bookings">
+      <dataSet id="bookings">
+         <sql fixedSchema="false">
+            <![CDATA[select	 
+(:startRange) startrange,
+(:endRange) endrange,
+(:clientName) clientName,
+(:therapistName) therapistName,
+(:facilityName) facilityName,
+(:bookingId) bookingId,
+
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:startRange, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:endRange, 'DD.MM.YYYY') as report_end,
+BOOKINGS.BOOKING_ID as BOOKING_ID,
+	 BOOKINGS.STATUS as STATUS,
+	 BOOKINGS.NAME as NAME,
+	 BOOKINGS.REFERENCE as REFERENCE,
+	 BOOKINGS.TIME_START as TIME_START,
+	 BOOKINGS.TIME_END as TIME_END,
+	 TO_CHAR(BOOKINGS.TIME_START, 'DD.MM.YY') as SDATE,
+	 TO_CHAR(BOOKINGS.TIME_START, 'HH24:MI') as STIME_START,
+	 TO_CHAR(BOOKINGS.TIME_END, 'HH24:MI') as STIME_END,
+	 BOOKINGS.PREP_TIME as PREP_TIME,
+	 BOOKINGS.CLEANOUT_TIME as CLEANOUT_TIME,
+	 BOOKINGS.RVC_ID as RVC_ID,
+	 BOOKINGS.DOC_ID as DOC_ID,
+   c.*, T.*, F.*
+ from	  BOOKINGS BOOKINGS,
+ (select booking_resources.BOOKING_ID, cards.card_id, cards.last_name || ' ' || cards.first_name || ' ' || cards.second_name as client_name, nvl(cards.birth_date,'') as birth_date
+ from  booking_resources booking_resources,  cards CARDS
+ where booking_resources.resource_type='P' and booking_resources.resource_id=cards.card_id) C,
+ (select booking_resources.BOOKING_ID, employees.empl_id, employees.name2 || ' ' || employees.name1 as empl_name
+ from  booking_resources booking_resources,  employees EMPLOYEES
+ where booking_resources.resource_type='T' and booking_resources.resource_id=employees.empl_id) T,
+ (select booking_resources.BOOKING_ID, facilities.facilities_id, facilities.name facility
+ from  booking_resources booking_resources,  facilities facilities
+ where booking_resources.resource_type='F' and booking_resources.resource_id=facilities.facilities_id) F
+ 
+WHERE bookings.booking_id=c.booking_id(+) AND bookings.booking_id=T.booking_id(+) AND bookings.booking_id=F.booking_id(+)
+AND (TRUNC(BOOKINGS.TIME_START) between nvl(:startRange,TRUNC(BOOKINGS.TIME_START)) and nvl(:endRange, TRUNC(BOOKINGS.TIME_START)) )
+AND (upper(c.client_name) LIKE upper(:clientName) || '%' or :clientName is null)
+AND (upper(t.empl_name) LIKE upper(:therapistName) || '%' or :therapistName is null)
+AND (upper(f.facility) LIKE upper(:facilityName) || '%' or :facilityName is null)
+AND (BOOKINGS.BOOKING_ID=nvl(:bookingId,BOOKINGS.BOOKING_ID))
+AND BOOKINGS.STATUS not in ('V','M')]]>
+         </sql>
+         <input id="startRange" value="${startRange}" dataType="xsd:date"/>
+         <input id="endRange" value="${endRange}" dataType="xsd:date"/>
+         <input id="clientName" value="${clientName}" dataType="xsd:string"/>
+         <input id="therapistName" value="${therapistName}" dataType="xsd:string"/>
+         <input id="facilityName" value="${facilityName}" dataType="xsd:string"/>
+         <input id="bookingId" value="${bookingId}" dataType="xsd:integer"/>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="startRange" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="endRange" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="clientName">
+         <input label="Client: "/>
+      </parameter>
+      <parameter id="therapistName">
+         <input label="Therapist: "/>
+      </parameter>
+      <parameter id="facilityName">
+         <input label="Facility: "/>
+      </parameter>
+      <parameter id="bookingId" dataType="xsd:integer">
+         <input label="Booking: "/>
+      </parameter>
+   </parameters>
+   <templates default="list by therapist EN">
+      <template label="list by therapist EN" type="rtf" url="bookingListEn.rtf"/>
+      <template label="list by client EN" type="rtf" url="bookingByClientEn.rtf"/>
+      <template label="list by therapist RU" type="rtf" url="bookingListRu.rtf"/>
+      <template label="list by client RU" type="rtf" url="bookingByClientRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

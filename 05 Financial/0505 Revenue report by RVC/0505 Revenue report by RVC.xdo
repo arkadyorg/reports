@@ -1,0 +1,201 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0505 Revenue report by RVC</title>
+   <description>HRS TNG3 report 0505 Revenue report by RVC</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="data">
+      <dataSet id="data">
+         <sql fixedSchema="false">
+            <![CDATA[SELECT
+    ins.rvcname,
+    (:d1) d1,
+    (:d2) d2,
+    ins.subscription_name,
+    ins.si,
+    ins.fgrp,
+    sum(ins.count) count,
+    sum(ins.taxadd) taxadd,
+    sum(ins.taxvat) taxvat,
+    sum(ins.amount) amount,
+    ins.MI_TYPE,
+    ins.typename
+FROM
+    (
+    select
+        nvl((select name from rvc where rvc_id = (:pRVC)),'All') rvcname,
+        (:d1) d1,
+        (:d2) d2,
+        mii.name1 || ' - ' || mii.code as subscription_name,
+        si.name as si,
+        fgrp.name as fgrp,
+        sum(ia.mi_count) * -1 as count,
+        0 as TAXADD,
+        0 as TAXVAT,
+        sum(ia.value_ttl) * -1  as amount,
+        mii.MI_TYPE,
+        DECODE(mii.MI_TYPE, 1, 'Menu Item',
+                            3, 'Subscription',
+                            4, 'Ticket',
+                            5, 'Treatment',
+                            7, 'Good',
+                            9, 'Inventory',
+                            'unknown') typename
+    from
+        item_accounting ia,
+        docs d,
+        menu_items mii,
+        subscription_accounting sa,
+        subscription_items si,
+        cards c,
+        menu_fgrp fgrp,
+        menu_si si,
+        rvc r
+    where
+        ia.doc_id = d.doc_id
+        and ia.card_id = c.card_id
+        and ia.subscription_accounting_id = sa.subscription_accounting_id
+        and ia.subscription_item_id = si.subscription_item_id
+        and mii.mi_id = si.dtl_mi_id
+        and mii.si = si.si_id
+        and mii.fgrp = fgrp.fgrp_id
+        and ia.value_ttl < 0
+        and trunc(d.bussines_date) between trunc(:d1) and trunc(:d2)
+        and d.check_open='F'
+        and d.cofirmation='T'
+        and d.rvc = nvl(:pRVC, d.rvc)
+        and mii.MI_TYPE not in (:exclude_item)
+        and d.rvc = r.rvc_id
+        and r.site_id in (:site_list)
+    group by
+        mii.name1 || ' - ' || mii.code,
+        si.name,
+        fgrp.name,
+        mii.MI_TYPE
+
+union all
+
+    select
+        nvl((select name from rvc where rvc_id = (:pRVC)),'All') rvcname,
+        (:d1) d1,
+        (:d2) d2,
+        DOCS_DTL.NAME || ' - ' || DOCS_DTL.MI_ID as subscription_name,
+        MENU_SI.NAME as si,
+        MENU_FGRP.NAME as fgrp,
+        SUM(DOCS_DTL.COUNT) as COUNT,
+        SUM(DOCS_DTL.TAX_ADD) as TAXADD,
+        SUM(DOCS_DTL.TAX_VAT) as TAXVAT,
+        SUM(DOCS_DTL.TTL-DOCS_DTL.DSC+DOCS_DTL.PAY_TTL_SUBSCR) as amount,
+        mii.MI_TYPE,
+        DECODE(mii.MI_TYPE, 1, 'Menu Item',
+                            3, 'Subscription',
+                            4, 'Ticket',
+                            5, 'Treatment',
+                            7, 'Good',
+                            9, 'Inventory',
+                            'unknown') typename
+    from   
+        MENU_FGRP MENU_FGRP,
+        MENU_SI MENU_SI,
+        DOCS_DTL DOCS_DTL,
+        DOCS DOCS,
+        menu_items mii,
+        RVC r
+    where   
+        DOCS.DOC_ID=DOCS_DTL.DOC_ID
+        and  MENU_SI.SI_ID=DOCS_DTL.SI
+        and  MENU_FGRP.FGRP_ID=DOCS_DTL.FGRP
+        and trunc(docs.tm) between :d1 and :d2
+        and docs.check_open='F'
+        and docs.cofirmation='T'
+        and docs_dtl.void_flag is null
+        and docs_dtl.mi_id = mii.code
+        and docs.rvc = nvl(:pRVC, docs.rvc)
+        and mii.MI_TYPE not in (:exclude_item)
+        and docs.rvc = r.rvc_id
+        and r.site_id in (:site_list)
+        GROUP BY 
+            DOCS_DTL.NAME || ' - ' || DOCS_DTL.MI_ID, 
+            DOCS_DTL.NAME,  
+            MENU_SI.NAME, 
+            MENU_FGRP.NAME, 
+            mii.MI_TYPE
+        order by 2,3,1) ins
+
+group BY
+    ins.rvcname,
+    ins.subscription_name,
+    ins.si,
+    ins.fgrp,
+    ins.MI_TYPE,
+    ins.typename]]>
+         </sql>
+         <input id="d1" value="${d1}" dataType="xsd:date"/>
+         <input id="d2" value="${d2}" dataType="xsd:date"/>
+         <input id="pRVC" value="${pRVC}" dataType="xsd:string"/>
+         <input id="exclude_item" value="${exclude_item}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="RVClist">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="mitypes">
+         <sql>
+            <![CDATA[select 'Menu Item','1' from dual
+union all
+select 'Subscription','3' from dual
+union all
+select 'Ticket','4' from dual
+union all
+select 'Treatment','5' from dual
+union all
+select 'Good','7' from dual
+union all
+select 'Inventory','9' from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites" cache="false">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="pRVC">
+         <select label="RVC: " valueSet="RVClist" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="d1" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="d2" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="exclude_item" defaultValue="3">
+         <select label="Exclude: " valueSet="mitypes" multiple="true" all="false" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="revenueEN">
+      <template label="revenueEN" type="rtf" url="revenueEn.rtf"/>
+      <template label="revenueRU" type="rtf" url="revenueRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

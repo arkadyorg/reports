@@ -1,0 +1,92 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1206 Medical assignments</title>
+   <description>HRS TNG3 report 1206 Medical assignments</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+	mp.MED_PACKAGE_ID,
+	mp.INSERT_DATE,
+	'('||c.card_id||') '||c.last_name||' '||c.FIRST_NAME cname,
+	mi.name1 medpack_name,
+	medcat.text medcat_name,
+	mpc.booking_id,
+	b.name,
+	b.TIME_START,
+	to_char(b.TIME_START,'dd.MM.yyyy') dateg
+
+
+from med_package mp, MED_PACKAGE_ASSIGN mpa, med_package_calendar mpc,
+	cards c, menu_items mi, bookings b,
+								(select
+								*
+								from reason_text rt
+								where rt.TYPE='W') medcat
+
+
+where  mp.card_id=c.card_id
+	and mp.MI_ID = mi.mi_id
+	and mp.MED_PACKAGE_ID = mpa.MED_PACKAGE_ID
+	and mpa.MED_CATEGORY_ID = medcat.reason_text_id
+	and mpa.med_package_assign_id = mpc.MP_ASSIGN_ID
+	and mpc.BOOKING_ID=b.booking_id
+	and b.status not in ('M','V')
+	and trunc(b.TIME_START) between trunc(:datar) and trunc(:daten)
+	and c.card_id = (:card_id)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="card_id" value="${card_id}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="card_id">
+         <input label="Client ID: "/>
+      </parameter>
+   </parameters>
+   <templates default="medAssignEn">
+      <template label="medAssignRu" type="rtf" url="medAssignRu.rtf"/>
+      <template label="medAssignEn" type="rtf" url="medAssignEn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

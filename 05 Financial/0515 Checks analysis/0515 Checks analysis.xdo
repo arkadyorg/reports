@@ -1,0 +1,220 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>Checks analysis</title>
+   <description>HRS TNG3 report</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    d.doc_id,
+    d.tm,
+    d.rvc,
+    r.name rvc_name,
+    d.chknum,
+    d.chck_id,
+    d.doc_type,
+    d.operator,
+    d.ttl,
+    d.workstation,
+    d.ft_status,
+    c.card_id,
+    c.last_name,
+    c.first_name,
+    c.second_name,
+    d.cofirmation,
+    d.check_open
+from docs d, rvc r, cards c
+where 
+    d.rvc = r.rvc_id
+    and d.def_card_id = c.card_id
+
+    and d.cofirmation  = (:confirmation_flag)
+    and d.check_open = (:open_flag)
+    and trunc(d.TM) between trunc(:datar) and trunc(:daten)
+    and (nvl(d.operator,'unknown operator') in (:emp))
+    and nvl(d.workstation,0) in (:work_stations)
+    and r.site_id in (:site_list)
+    and d.doc_type in (:document_type)
+    and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+    and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))]]>
+         </sql>
+         <input id="confirmation_flag" value="${confirmation_flag}" dataType="xsd:string"/>
+         <input id="open_flag" value="${open_flag}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="emp" value="${emp}" dataType="xsd:string"/>
+         <input id="work_stations" value="${work_stations}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+         <input id="document_type" value="${document_type}" dataType="xsd:string"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+--(select listagg(to_char(name2||' '||name1), ',') within group (order by name2||' '||name1)  from employees where name2||' '||name1 in (:emp)) hemplist,
+nvl((select name from rvc_group where rvc_group_id = (:rvcgroup)),'All') rgroup,
+nvl((select name from rvc where rvc_id = (:rvcid)),'All') rvc
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="emp" value="${emp}" dataType="xsd:string"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvc_group">
+         <sql>
+            <![CDATA[select name, rvc_group_id as rvrcgroup from rvc_group
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvcid" cache="false">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="operator">
+         <sql>
+            <![CDATA[select
+    operator
+from
+    (select distinct 
+        operator,
+        'T' optype
+    from docs
+    where operator is not null and operator in (select name2||' '||name1 from employees)
+
+    union all
+
+    select distinct 
+        operator,
+        'E' optype
+    from docs
+    where operator is not null and operator not in (select name2||' '||name1 from employees)
+
+    union all
+
+    select
+        'unknown operator' operator,
+        'U' optype
+    from dual)
+order by operator asc]]>
+         </sql>
+      </valueSet>
+      <valueSet id="ws">
+         <sql>
+            <![CDATA[select
+iplist.name,
+nvl(iplist.va,0)
+from
+(
+select distinct 
+        workstation name,
+        workstation va
+    from docs
+union all
+select
+'Empty' name,
+'' va
+from dual) iplist
+where iplist.name is not null
+order by iplist.name asc]]>
+         </sql>
+      </valueSet>
+      <valueSet id="TF_flag">
+         <sql>
+            <![CDATA[select 'True','T' from dual
+union all
+select 'False','F' from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="dtypes">
+         <sql>
+            <![CDATA[select 'Bill','A' from dual
+union all
+select 'Deposit','D' from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvcgroup" dataType="xsd:integer">
+         <select label="RVC group: " valueSet="rvc_group" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="rvcid" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvcid" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="emp">
+         <select label="Employee: " valueSet="operator" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="confirmation_flag" defaultValue="False" dataType="xsd:string">
+         <select label="Confirmation flag:" valueSet="TF_flag" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="open_flag" defaultValue="True" dataType="xsd:string">
+         <select label="Check open flag:" valueSet="TF_flag" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="document_type">
+         <select label="Document type:" valueSet="dtypes" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="work_stations">
+         <select label="Workstations: " valueSet="ws" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="Checks analysis En">
+      <template label="Checks analysis En" type="rtf" url="checksAnalysisEn.rtf"/>
+      <template label="Checks Analysis By Operator En" type="rtf" url="checksAnalysisByOperatorEn.rtf"/>
+      <template label="Checks Analysis By Station En" type="rtf" url="checksAnalysisByStationEn.rtf"/>
+      <template label="Checks Analysis By RVC En" type="rtf" url="checksAnalysisByRVCEn.rtf"/>
+      <template label="Checks Analysis By Client En" type="rtf" url="checksAnalysisByCIDEn.rtf"/>
+      <template label="Сhecks Analysis Ru" type="rtf" url="checksAnalysisRu.rtf"/>
+      <template label="Сhecks Analysis By Station Ru" type="rtf" url="checksAnalysisByStationRu.rtf"/>
+      <template label="Сhecks Analysis By RVC Ru" type="rtf" url="checksAnalysisByRVCRu.rtf"/>
+      <template label="Сhecks Analysis By Operator Ru" type="rtf" url="checksAnalysisByOperatorRu.rtf"/>
+      <template label="Checks Analysis By Client Ru" type="rtf" url="checksAnalysisByCIDRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

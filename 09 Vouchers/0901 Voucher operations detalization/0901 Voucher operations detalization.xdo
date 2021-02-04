@@ -1,0 +1,190 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0901 Voucher operations detalization</title>
+   <description>HRS TNG3 report 0901 Voucher operations detalization</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    d.doc_id,
+    d.tm,
+    d.chknum,
+    v.code vouchercode,
+    r.rvc_id,
+    r.name rvcname,
+    va.value,
+    va.dsc dsc,
+    LISTAGG(to_char(nvl(dd.name,'no item operation')), ', ') WITHIN GROUP (ORDER BY d.doc_id) itemname,
+    to_char(c.LAST_NAME||' '||c.FIRST_NAME) as fio,
+    (case when va.value >= 0 then 'p' else 'n' end) optype
+from 
+    docs d,
+    voucher_accounting va, 
+    voucher v, 
+    VOUCHER_CAMPAIGN vc, 
+    rvc r, 
+    docs_dtl dd, 
+    cards c
+where 
+    d.cofirmation ='T'
+    and d.CHECK_OPEN = 'F'
+    and d.doc_id=va.doc_id
+    and d.DEF_CARD_ID=c.card_id
+    and va.VOUCHER_ID=v.VOUCHER_ID
+    and v.VOUCHER_CAMPAIGN_ID=vc.VOUCHER_CAMPAIGN_ID
+    and d.rvc=r.rvc_id
+    and d.doc_id=dd.doc_id(+)
+    and dd.void_flag is null
+    and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+    and (:rvcid is null or r.rvc_id in (select rvc_id from rvc where rvc_id=:rvcid))
+    and v.CODE= nvl(:code,v.CODE)
+    and (case when va.value >= 0 then 'p' else 'n' end) in (:optype)
+    and (upper(c.LAST_NAME||' '||c.FIRST_NAME) LIKE upper(:clientName) || '%' or :clientName is null)
+
+group by
+    d.doc_id,
+    d.tm,
+    d.chknum,
+    v.code ,
+    r.rvc_id,
+    r.name ,
+    va.value,
+    va.dsc,
+    c.LAST_NAME,
+    c.FIRST_NAME
+
+union all
+
+select
+    d.doc_id,
+    d.tm,
+    d.chknum,
+    v.code vouchercode,
+    r.rvc_id,
+    r.name rvcname,
+    va.value,
+    va.dsc dsc,
+    LISTAGG(to_char(nvl(dd.name,'no item operation')), ', ') WITHIN GROUP (ORDER BY d.doc_id) itemname,
+    to_char('not defined guest') as fio,
+    (case when va.value >= 0 then 'p' else 'n' end) optype
+
+from 
+    docs d, 
+    voucher_accounting va, 
+    voucher v, 
+    VOUCHER_CAMPAIGN vc, 
+    rvc r, 
+    docs_dtl dd--, cards c
+where 
+    d.cofirmation ='T'
+    and d.CHECK_OPEN = 'F'
+    and d.doc_id=va.doc_id
+    --and d.DEF_CARD_ID=c.card_id
+    and va.VOUCHER_ID=v.VOUCHER_ID
+    and v.VOUCHER_CAMPAIGN_ID=vc.VOUCHER_CAMPAIGN_ID
+    and d.rvc=r.rvc_id
+    and d.doc_id=dd.doc_id(+)
+    and dd.void_flag is null
+    and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+    and (:rvcid is null or r.rvc_id in (select rvc_id from rvc where rvc_id=:rvcid))
+    and v.CODE= nvl(:code,v.CODE)
+    and (case when va.value >= 0 then 'p' else 'n' end) in (:optype)
+    and d.def_card_id is null
+
+group by
+    d.doc_id,
+    d.tm,
+    d.chknum,
+    v.code ,
+    r.rvc_id,
+    r.name ,
+    va.value,
+    va.dsc]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+         <input id="code" value="${code}" dataType="xsd:string"/>
+         <input id="optype" value="${optype}" dataType="xsd:string"/>
+         <input id="clientName" value="${clientName}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+nvl((select name from rvc where rvc_id = (:rvcid)),'All') rvc,
+--nvl((select code from voucher where code = (:voucher)),'All') voucher
+(:voucher) voucher
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="optypelist">
+         <sql>
+            <![CDATA[select 'Top ups','p' from dual
+union all
+select 'Redemptions','n' from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="rvcid" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvc" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="code">
+         <input label="Voucher code: "/>
+      </parameter>
+      <parameter id="optype">
+         <select label="Operation type: " valueSet="optypelist" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="clientName">
+         <input label="Client: "/>
+      </parameter>
+   </parameters>
+   <templates default="voucherOpsDetailsEn">
+      <template label="voucherOpsDetailsEn" type="rtf" url="voucherOpsDetailsEn.rtf"/>
+      <template label="voucherOpsDetailsGroupedEn" type="rtf" url="voucherOpsDetailsGroupedEn.rtf"/>
+      <template label="voucherOpsDetailsGroupedRu" type="rtf" url="voucherOpsDetailsGroupedRu.rtf"/>
+      <template label="voucherOpsDetailsRu" type="rtf" url="voucherOpsDetailsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

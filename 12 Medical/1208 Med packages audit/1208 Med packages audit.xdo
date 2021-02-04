@@ -1,0 +1,103 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1208 Med packages audit</title>
+   <description>HRS TNG3 report 1208 Med packages audit</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	mp.card_id,
+	c.FIRST_NAME,
+	c.LAST_NAME,
+	c.second_name,
+	c.GENDER,
+	c.BIRTH_DATE,
+	c.PHONE,
+	c.NOTES,
+	mp.MED_PACKAGE_ID,
+	mi.NAME1,
+	mp.ACTIVE_FROM,
+	mp.ACTIVE_TILL,
+	mp.CANCEL_DATE,
+	mp.INSERT_DATE,
+	mp.DOC_ID,
+	mp.mi_id,
+	mpa.QTY,
+	mpa.MED_CATEGORY_ID,
+	rt.TEXT,
+	mpa.MI_ID,
+	b.name,
+	b.TIME_START,
+	b.TIME_END
+
+
+from med_package mp, cards c, MED_PACKAGE_ASSIGN mpa, med_package_calendar mpc, bookings b, REASON_TEXT rt, MENU_ITEMS mi
+
+where mp.CARD_ID = c.card_id
+	and mp.MED_PACKAGE_ID = mpa.MED_PACKAGE_ID
+	and mpa.MED_PACKAGE_ASSIGN_ID = mpc.mp_assign_id
+	and mpc.BOOKING_ID = b.BOOKING_ID
+	and mp.MI_ID = mi.mi_id
+	and mpa.MED_CATEGORY_ID = rt.REASON_TEXT_ID(+)
+	and b.STATUS not in ('V')
+	and rt.TYPE = 'W'
+	and (upper(mp.card_id) LIKE upper(:cid|| '%') or :cid is null)
+	and trunc(mp.INSERT_DATE) between trunc(:datar) and trunc(:daten)]]>
+         </sql>
+         <input id="cid" value="${cid}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="cid">
+         <input label="Client ID:"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="Med packages audit dtl En">
+      <template label="Med packages audit dtl En" type="rtf" url="medPackAuditEn.rtf"/>
+      <template label="Med packages audit dtl Ru" type="rtf" url="medPackAuditRu.rtf"/>
+      <template label="Med packages audit short En" type="rtf" url="medPackAuditShortEn.rtf"/>
+      <template label="Med packages audit short Ru" type="rtf" url="medPackAuditShortRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

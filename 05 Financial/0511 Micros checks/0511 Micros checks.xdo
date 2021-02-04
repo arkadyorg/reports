@@ -1,0 +1,119 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0511 Micros checks</title>
+   <description>HRS TNG3 report 0511 Micros checks</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	dd.doc_id,
+	dd.name itemname,
+	dd.count,
+	dd.ttl-dd.dsc+dd.pay_ttl_subscr couttl,
+	dd.ttl,
+	dd.dsc,
+	dd.si,
+	dd.fgrp,
+	dd.mi_id,
+	d.rvc,
+	r.name rvcname,
+	d.chknum,
+	d.gst,
+	d.operator operatorname,
+	d.ttl chkttl,
+	d.def_card_type_id,
+	d.def_magstripe,
+	d.tm,
+	'('||d.def_card_id||') '||c.last_name||' '||c.first_name||' '||c.second_name fio
+
+from docs_dtl dd, docs d, rvc r, cards c, card_types ct
+	where dd.doc_id = d.doc_id
+	and d.rvc=r.rvc_id
+	and d.def_card_id = c.card_id
+	and d.def_card_type_id = ct.CARD_TYPE_ID
+	and dd.void_flag is null
+	and d.cofirmation ='T'
+	and d.check_open = 'F'
+	and d.rvc in (:RVCcode, :RVCcode)
+	and upper(dd.name) like upper('%'||:miname||'%')
+    and r.site_id in (:site_list)
+	--and r.options = 2
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)]]>
+         </sql>
+         <input id="RVCcode" value="${RVCcode}" dataType="xsd:string"/>
+         <input id="miname" value="${miname}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="RVC" cache="false">
+         <sql>
+            <![CDATA[select name,rvc_id from rvc order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="RVCcode">
+         <select label="RVC: " valueSet="RVC" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="miname">
+         <input label="Menu Item name:"/>
+      </parameter>
+   </parameters>
+   <templates default="microsChecksEn">
+      <template label="microsChecksEn" type="rtf" url="microsChecksEn.rtf"/>
+      <template label="microsChecksRu" type="rtf" url="microsChecksRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

@@ -1,0 +1,74 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0201 Birth dates</title>
+   <description>HRS TNG3 report 0201 Birth dates</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="true"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+    TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+    c.card_id,
+    c.LAST_NAME||' '||c.FIRST_NAME||' '||c.SECOND_NAME full_name,
+    ct.type_name card_type,
+    trunc(c.birth_date) CURRENTBD,
+    to_char(trunc(c.birth_date), 'DDD') ordr,
+    c.PHONE,
+    c.CELL_PHONE,
+    c.EMAIL
+from cards c, card_types ct
+where c.CARD_TYPE_ID=ct.CARD_TYPE_ID
+and c.BIRTH_DATE is not null
+and to_char(c.birth_date, 'DDD') between to_char(:datar, 'DDD') and to_char(:daten, 'DDD')
+
+order by to_char(trunc(c.birth_date), 'DDD') asc]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+* from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From day: " format="dd.MM"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To day: " format="dd.MM"/>
+      </parameter>
+   </parameters>
+   <templates default="birthEN">
+      <template label="birthRU" type="rtf" url="birthDatesRu.rtf"/>
+      <template label="birthEN" type="rtf" url="birthDatesEn.rtf"/>
+   </templates>
+   <burst enabled="false">
+      <property name="BURSTING_NODE" value="/ROWSET"/>
+      <property name="DELIVERY_KEY" value="/ROWSET"/>
+   </burst>
+</report>

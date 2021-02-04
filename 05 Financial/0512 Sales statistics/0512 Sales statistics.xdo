@@ -1,0 +1,347 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0512 Sales statistics</title>
+   <description>HRS TNG3 report 0512 Sales statistics</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet11">
+         <sql fixedSchema="false">
+            <![CDATA[-- Sales
+select
+	d.rvc,
+	r.name Salesrvcname,
+	sum(dd.ttl) Salessumttl,
+	sum(dd.dsc) Salessumdsc,
+	sum(dd.ttl-dd.dsc+dd.pay_ttl_subscr) Salesfinalttl
+	
+	from docs_dtl dd, docs d, rvc r
+	where trunc(d.tm) between trunc(:datar) and trunc(:daten) --param
+		--and d.RVC = --param
+		and d.doc_id=dd.doc_id
+		and d.rvc=r.rvc_id
+		and d.COFIRMATION = 'T'
+		and d.CHECK_OPEN = 'F'
+		and dd.VOID_FLAG is null
+        and r.site_id in (:site_list)
+
+group by 
+	d.rvc,
+	r.name]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet12">
+         <sql fixedSchema="false">
+            <![CDATA[--Returns
+select
+	d.rvc Returnsrvc,
+	r.name Returnsrvcname,
+	sum(dd.ttl) Returnssumttl,
+	sum(dd.dsc) Returnssumdsc,
+	sum(dd.ttl-dd.dsc+dd.pay_ttl_subscr) Returnsfinalttl,
+	sum(1) Returnstransnum
+from docs_dtl dd, docs d, rvc r
+where trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	--and d.RVC = --param
+	and d.doc_id=dd.doc_id
+	and d.rvc=r.rvc_id
+	and d.COFIRMATION = 'T'
+	and d.CHECK_OPEN = 'F'
+	and d.VOID_REASON is not null
+	and d.ttl < 0
+	and dd.VOID_flag is null
+    and r.site_id in (:site_list)
+	group by 
+	d.rvc,
+	r.name]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet122">
+         <sql fixedSchema="false">
+            <![CDATA[--Voids
+select
+	d.rvc Voidsrvc,
+	r.name Voidsrvcname,
+	sum(dd.ttl) Voidssumttl,
+	sum(dd.dsc) Voidssumdsc,
+	sum(dd.ttl-dd.dsc+dd.pay_ttl_subscr) Voidsfinalttl,
+	sum(1) Voidstransnum
+from docs_dtl dd, docs d, rvc r
+where trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	--and d.RVC = --param
+	and d.doc_id=dd.doc_id
+	and d.rvc=r.rvc_id
+	and d.COFIRMATION = 'T'
+	and d.CHECK_OPEN = 'F'
+	and dd.ttl < 0
+	and dd.VOID_flag is not null
+    and r.site_id in (:site_list)
+	group by 
+	d.rvc,
+	r.name]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet123">
+         <sql fixedSchema="false">
+            <![CDATA[--Grand total
+select
+	d.rvc gtrvc,
+	r.name gtrvcname,
+	sum(d.ttl) gtgrand
+from docs d, rvc r
+where d.rvc=r.rvc_id
+and d.COFIRMATION='T'
+and d.CHECK_OPEN='F'
+and r.site_id in (:site_list)
+	--d.RVC = --param
+	group by 
+	d.rvc,
+	r.name]]>
+         </sql>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet124">
+         <sql fixedSchema="false">
+            <![CDATA[--Void reasons
+select
+	d.rvc vrrvc,
+	r.name vrrvcname,
+	dd.VOID_REASON vrvr,
+	sum(1) vrtransnum
+from docs_dtl dd, docs d, rvc r
+where trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	--and d.RVC = --param
+	and d.doc_id=dd.doc_id
+	and d.rvc=r.rvc_id
+	and d.COFIRMATION = 'T'
+	and d.CHECK_OPEN = 'F'
+	and dd.ttl < 0
+	and dd.VOID_flag is not null
+    and r.site_id in (:site_list)
+group by 
+	d.rvc,
+	dd.VOID_REASON,
+	r.name]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet13">
+         <sql fixedSchema="false">
+            <![CDATA[--Check status
+select
+	'Closed checks' chks,
+	sum(1) csnumbr,
+	sum(d.ttl) csttl
+from docs d, rvc r
+where d.COFIRMATION = 'T'
+	and d.CHECK_OPEN = 'F'
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+    and d.rvc = r.rvc_id
+	--and d.RVC = --param
+	and d.CHKNUM is not null
+    and r.site_id in (:site_list)
+
+union all
+
+select
+	'Open checks' chks,
+	nvl(sum(1),0) csnumbr,
+	nvl(sum(d.ttl),0) csttl
+from docs d, rvc r
+where d.CHECK_OPEN = 'T'
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+    and d.rvc = r.rvc_id
+	--and d.RVC = --param
+	and d.CHKNUM is not null
+    and r.site_id in (:site_list)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet21">
+         <sql fixedSchema="false">
+            <![CDATA[-- SI list
+select
+	d.rvc silrvc,
+	r.name silrvcname,
+	msi.NAME silname,
+	sum(1) silnumbr
+from docs_dtl dd, docs d, menu_si msi, rvc r
+
+where dd.doc_id=d.doc_id
+	and dd.si=msi.SI_ID
+	and d.rvc=r.rvc_id
+	and d.COFIRMATION = 'T'
+	and d.CHECK_OPEN = 'F'
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	--and d.RVC = --param
+	and dd.VOID_FLAG is null
+    and r.site_id in (:site_list)
+
+group by
+	d.rvc,
+	msi.NAME,
+	r.name]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet22">
+         <sql fixedSchema="false">
+            <![CDATA[-- TM list
+select
+	d.rvc tmrvc,
+	r.name tmrvcname,
+	dp.TM_NAME tmtn,
+	sum(1) tmsales
+from docs d, docs_paym dp, rvc r
+
+where d.doc_id=dp.doc_id
+	and d.rvc = r.rvc_id
+	and d.COFIRMATION = 'T'
+	and d.CHECK_OPEN = 'F'
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+    and r.site_id in (:site_list)
+	--and d.RVC = --param
+
+group by
+	d.rvc,
+	dp.TM_NAME,
+	r.name]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet23">
+         <sql fixedSchema="false">
+            <![CDATA[select
+salettl.Salesfinalttl/cs.csnumbr avgch
+from (
+-- Sales
+select
+
+	sum(dd.ttl-dd.dsc+dd.pay_ttl_subscr) Salesfinalttl
+	
+	from docs_dtl dd, docs d, rvc r
+	where trunc(d.tm) between trunc(:datar) and trunc(:daten)
+		--and d.RVC = --param
+		and d.doc_id=dd.doc_id
+		and d.rvc=r.rvc_id
+		and d.COFIRMATION = 'T'
+		and d.CHECK_OPEN = 'F'
+		and dd.VOID_FLAG is null
+        and r.site_id in (:site_list)) salettl,
+    
+    
+    (--Check status
+select
+	sum(1) csnumbr
+from docs d
+where d.COFIRMATION = 'T'
+	and d.CHECK_OPEN = 'F'
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	--and d.RVC = --param
+	and d.CHKNUM is not null
+) cs]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet11>
+                  <nodeList dataSet="DataSet11" select="/ROWSET/DATASET11_ROW"/>
+               </DataSet11>
+               <DataSet12>
+                  <nodeList dataSet="DataSet12" select="/ROWSET/DATASET12_ROW"/>
+               </DataSet12>
+               <DataSet122>
+                  <nodeList dataSet="DataSet122" select="/ROWSET/DATASET122_ROW"/>
+               </DataSet122>
+               <DataSet123>
+                  <nodeList dataSet="DataSet123" select="/ROWSET/DATASET123_ROW"/>
+               </DataSet123>
+               <DataSet124>
+                  <nodeList dataSet="DataSet124" select="/ROWSET/DATASET124_ROW"/>
+               </DataSet124>
+               <DataSet13>
+                  <nodeList dataSet="DataSet13" select="/ROWSET/DATASET13_ROW"/>
+               </DataSet13>
+               <DataSet21>
+                  <nodeList dataSet="DataSet21" select="/ROWSET/DATASET21_ROW"/>
+               </DataSet21>
+               <DataSet22>
+                  <nodeList dataSet="DataSet22" select="/ROWSET/DATASET22_ROW"/>
+               </DataSet22>
+               <DataSet23>
+                  <nodeList dataSet="DataSet23" select="/ROWSET/DATASET23_ROW"/>
+               </DataSet23>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s
+]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="Daily RVC Sales Detail En">
+      <template label="Daily RVC Sales Detail En" type="rtf" url="drsdEn.rtf"/>
+      <template label="Daily RVC Sales Detail Ru" type="rtf" url="drsdRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

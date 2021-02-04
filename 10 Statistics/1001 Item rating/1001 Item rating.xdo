@@ -1,0 +1,238 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1001 Item rating</title>
+   <description>HRS TNG3 report 1001 Item rating</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+
+(:dStart) dStart,
+(:dEnd) dEnd
+--(select listagg(to_char(si.name), ',') within group (order by si.si_id) a from menu_si si where si.si_id in (:pSI)) siname
+--(:pSI) siname
+--nvl((select name from menu_fgrp where fgrp_id = (:pFGRP)),'All') fgrpname,
+--nvl((select name from rvc where rvc_id = (:pRVC)),'All') rvcname
+--,(:topnum) topnum future dev
+from dual]]>
+         </sql>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+         <input id="pSI" value="${pSI}" dataType="xsd:string"/>
+         <input id="pFGRP" value="${pFGRP}" dataType="xsd:string"/>
+         <input id="pRVC" value="${pRVC}" dataType="xsd:string"/>
+         <input id="topnum" value="${topnum}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	insel.name,
+	sum(insel.count) count,
+	insel.si,
+	insel.si_id,
+	insel.fgrp,
+	insel.fgrp_id,
+	sum(insel.ddttl) ddttl,
+	insel.type,
+	insel.rvc
+
+from
+	(
+	select
+		dd.doc_id,
+		dd.name,
+		sum(dd.count) count,
+		'External POS' si,
+		'9999' si_id,
+		'External POS' fgrp,
+		'9999' fgrp_id,
+		sum(dd.ttl-dd.dsc+dd.pay_ttl_subscr) ddttl,
+		'e' type,
+		d.rvc
+	from docs_dtl dd, (
+						select
+						*
+						from docs d
+						where d.COFIRMATION ='T'
+						and trunc(d.tm) between (:dStart) and (:dEnd)
+						and d.CHECK_OPEN ='F'
+						and d.rvc in (select rvc_id from RVC where BITAND(to_number(OPTIONS, 'xxxxxxxx'), POWER(2,1)) != 0) --get external POS docs
+						and d.def_card_type_id in (:ctypes)
+						) d
+
+	where dd.void_flag is null
+		and dd.doc_id = d.doc_id
+
+	group by
+		dd.doc_id,
+		dd.name,
+		d.rvc
+	  
+	union all
+
+	select
+		dd.doc_id,
+		dd.name,
+		sum(dd.count) count,
+		to_char(ms.name) si,
+		dd.si si_id,
+		to_char(mf.name) fgrp,
+		dd.fgrp fgrp_id,
+		sum(dd.ttl-dd.dsc+dd.pay_ttl_subscr) ddttl,
+		'i' type,
+		d.rvc
+	from docs_dtl dd,MENU_FGRP mf, MENU_SI ms, (
+						select
+						*
+						from docs d
+						where d.COFIRMATION ='T'
+						and trunc(d.tm) between (:dStart) and (:dEnd)
+						and d.CHECK_OPEN ='F'
+						and d.rvc in (select rvc_id from RVC where BITAND(to_number(OPTIONS, 'xxxxxxxx'), POWER(2,1)) = 0) -- get internal POS docs
+						and d.def_card_type_id in (:ctypes)
+						) d
+
+	where dd.void_flag is null
+		and dd.doc_id = d.doc_id
+		and dd.si=ms.SI_ID(+)
+		and dd.fgrp=mf.FGRP_ID(+)
+
+	group by
+		dd.doc_id,
+		dd.name,
+		dd.si,
+		dd.fgrp,
+		ms.name,
+		mf.name,
+		d.rvc
+	) insel
+where insel.rvc in (:pRVC)
+and insel.si_id in (:pSI)
+and insel.fgrp_id in (:pFGRP)
+
+
+group by 
+	insel.name,
+	insel.si,
+	insel.si_id,
+	insel.fgrp,
+	insel.fgrp_id,
+	insel.type,
+	insel.rvc]]>
+         </sql>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+         <input id="ctypes" value="${ctypes}" dataType="xsd:string"/>
+         <input id="pRVC" value="${pRVC}" dataType="xsd:string"/>
+         <input id="pSI" value="${pSI}" dataType="xsd:string"/>
+         <input id="pFGRP" value="${pFGRP}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="SIlist">
+         <sql>
+            <![CDATA[select to_char(si_id|| ' - '|| name) name, si_id from menu_si 
+union all
+select '9999 - External POS' , 9999 si_id from dual
+--select '9999' , 9999 si_id from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="FGRPlist">
+         <sql>
+            <![CDATA[select to_char(fgrp_id|| ' - '||name) name , fgrp_id  from menu_fgrp 
+union all 
+select '9999 - External POS' name , 9999 fgrp_id from dual
+order by fgrp_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="RVClist">
+         <sql>
+            <![CDATA[select
+RVCLIST.name,
+RVCLIST.rvcid
+from
+
+(select name, rvc_id as rvcid, 'e' type
+from rvc 
+where BITAND(to_number(OPTIONS, 'xxxxxxxx'), POWER(2,1)) != 0 --external POS
+
+union all
+
+select name, rvc_id as rvcid, 'i' type
+from rvc 
+where BITAND(to_number(OPTIONS, 'xxxxxxxx'), POWER(2,1)) = 0 --internal POS
+) RVCLIST
+where rvclist.type in (:postype) --exparam
+order by RVCLIST.name]]>
+         </sql>
+         <input id="postype" value="${postype}" dataType="xsd:string"/>
+      </valueSet>
+      <valueSet id="postypelist">
+         <sql>
+            <![CDATA[--select 'All POS types','ie' from dual
+--union all
+select 'External POS','e' from dual
+union all
+select 'Internal POS','i' from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="ctype">
+         <sql>
+            <![CDATA[select type_name, CARD_TYPE_ID from card_types order by type_name]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="dStart" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="dEnd" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="pSI">
+         <select label="Menu group: " valueSet="SIlist" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="pFGRP">
+         <select label="Menu family groups: " valueSet="FGRPlist" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="postype">
+         <select label="POS type:" valueSet="postypelist" multiple="false" all="true" allValue="lov" refreshParameters="true"/>
+      </parameter>
+      <parameter id="pRVC">
+         <select label="RVC: " valueSet="RVClist" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="topnum" defaultValue="50" dataType="xsd:integer"/>
+      <parameter id="ctypes">
+         <select label="Card Type: " valueSet="ctype" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="ratingByNumEN">
+      <template label="ratingByNumEN" type="rtf" url="itemRatingNumEn.rtf"/>
+      <template label="ratingByNumRu" type="rtf" url="itemRatingNumRu.rtf"/>
+      <template label="ratingByTotalEN" type="rtf" url="itemRatingTotalEn.rtf"/>
+      <template label="ratingByTotalRu" type="rtf" url="itemRatingTotalRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

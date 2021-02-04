@@ -1,0 +1,157 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0301 CRM Events</title>
+   <description>HRS TNG3 report 0301 CRM Events</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:cfrom) cfrom,
+(:cto) cto,
+(:uform) uform,
+(:uto) uto,
+nvl((select last_name||' '||first_name from cards where card_id = (:ptaclients)),'All') ptaclients,
+nvl((select name2||' '||name1 from employees where empl_id = (:eie)),'All') eie,
+nvl((select name from crm_type where crm_type_id = (:ptti)),'All') ptti
+from dual]]>
+         </sql>
+         <input id="cfrom" value="${cfrom}" dataType="xsd:date"/>
+         <input id="cto" value="${cto}" dataType="xsd:date"/>
+         <input id="uto" value="${uto}" dataType="xsd:date"/>
+         <input id="ptaclients" value="${ptaclients}" dataType="xsd:string"/>
+         <input id="eie" value="${eie}" dataType="xsd:string"/>
+         <input id="ptti" value="${ptti}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+
+'('||cr.card_id||') '||c.last_name||' '||c.first_name||' '||c.second_name FIO,
+cr.EVENT_COMMENT ,
+cr.EVENT_INSERT_TM ,
+cr.EVENT_TITLE ,
+cr.EVENT_UPDATE_TM ,
+
+cr.EVENT_INSERT_EMPL ,
+eie.name1||' '||eie.name2 eie,
+--cr.EVENT_RESULT_TYPE_ID ,
+ct.name,
+cr.EVENT_UPDATE_EMPL,
+--eue.name1||' '||eue.name2 eue, --future dev
+
+cr.EMAIL_BODY ,
+cr.EMAIL_DELIVERY_RESULT ,
+cr.EMAIL_DELIVERY_TM ,
+cr.EMAIL_TITLE ,
+
+cr.SMS_DELIVERY_RESULT ,
+cr.SMS_DELIVERY_TM ,
+cr.SMS_TEXT
+
+from CRM cr, cards c, crm_type ct, employees eie--, employees eue
+
+where cr.card_id=c.card_id
+and cr.EVENT_RESULT_TYPE_ID = ct.crm_type_id
+and cr.EVENT_INSERT_EMPL = eie.EMPL_ID
+and (trunc(cr.EVENT_INSERT_TM) between (:cfrom) and (:cto) 
+or trunc(cr.EVENT_UPDATE_TM) between (:ufrom) and (:uto))
+and cr.card_id in nvl((:ptaclients),cr.card_id)
+
+
+
+and cr.EVENT_INSERT_EMPL in nvl((:eie),cr.EVENT_INSERT_EMPL)
+
+and cr.EVENT_RESULT_TYPE_ID in nvl((:ptti),cr.EVENT_RESULT_TYPE_ID)
+
+
+--and cr.EVENT_UPDATE_EMPL = eue.EMPL_ID --future dev]]>
+         </sql>
+         <input id="cfrom" value="${cfrom}" dataType="xsd:date"/>
+         <input id="cto" value="${cto}" dataType="xsd:date"/>
+         <input id="ufrom" value="${ufrom}" dataType="xsd:date"/>
+         <input id="uto" value="${uto}" dataType="xsd:date"/>
+         <input id="ptaclients" value="${ptaclients}" dataType="xsd:string"/>
+         <input id="eie" value="${eie}" dataType="xsd:string"/>
+         <input id="ptti" value="${ptti}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="EIE">
+         <sql>
+            <![CDATA[select distinct
+e.name1||' '||e.name2,
+cr.event_insert_empl eie
+from crm cr, employees e
+where event_insert_empl = e.empl_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="TTI">
+         <sql>
+            <![CDATA[select
+name,
+crm_type_id
+from crm_type
+where role = 1]]>
+         </sql>
+      </valueSet>
+      <valueSet id="taclients">
+         <sql>
+            <![CDATA[select distinct
+c.last_name||' '||c.first_name||' ('||cr.card_id||')',
+cr.card_id ci
+from crm cr, cards c
+where cr.card_id = c.card_id]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="cfrom" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Created from: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="cto" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Created to: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="ufrom" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Updated from: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="uto" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Updated to: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="ptaclients">
+         <select label="Clients: " valueSet="taclients" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="eie">
+         <select label="Event insert employee: " valueSet="EIE" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="ptti">
+         <select label="Result code: " valueSet="TTI" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="CRMe EN">
+      <template label="CRMe EN" type="rtf" url="CRMEventsEn.rtf"/>
+      <template label="CRMe RU" type="rtf" url="CRMEventsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

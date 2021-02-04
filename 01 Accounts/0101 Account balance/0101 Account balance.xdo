@@ -1,0 +1,142 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0101 Account balance</title>
+   <description>HRS TNG3 report 0101 Account balance</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="4"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select a.* from (
+select 
+	:ur||'&dStart='||to_char(:date_from,'DD.MM.YY')||'&dEnd='||to_char(:date_to,'DD.MM.YY')||'&InIdCard='||c.card_id||'&selAccount='||:vtype||'&report_type=0&RVCcode=*&_xt=Client%20account%20detailed&_xf=html&_xmode=0' ht,
+	c.last_name||' '||c.first_name||' ('||c.card_id||')' guest,
+	ad.account_code,
+	ad.name accname,
+	nvl((select sum(a.amount) from accounting a, docs d where a.account_def_id=ab.account_def_id and a.doc_id=d.doc_id and a.card_id=c.card_id and d.cofirmation='T' and trunc(d.BUSSINES_DATE) <=trunc(:date_from)),0) incombal,
+	nvl((select sum(a.amount) from accounting a, docs d where a.account_def_id=ab.account_def_id and a.doc_id=d.doc_id and a.card_id=c.card_id and d.cofirmation='T' and (trunc(d.BUSSINES_DATE)>trunc(:date_from) and trunc(d.BUSSINES_DATE)<=trunc(:date_to))),0) movebal,
+	nvl((select sum(a.amount) from accounting a, docs d where a.account_def_id=ab.account_def_id and a.amount > 0 and a.doc_id=d.doc_id and a.card_id=c.card_id and d.cofirmation='T' and (trunc(d.BUSSINES_DATE)>trunc(:date_from) and trunc(d.BUSSINES_DATE)<=trunc(:date_to))),0) credbal,
+	nvl((select sum(a.amount) from accounting a, docs d where a.account_def_id=ab.account_def_id and a.amount < 0 and a.doc_id=d.doc_id and a.card_id=c.card_id and d.cofirmation='T' and (trunc(d.BUSSINES_DATE)>trunc(:date_from) and trunc(d.BUSSINES_DATE)<=trunc(:date_to))),0) debbal,
+	nvl((select sum(a.amount) from accounting a, docs d where a.account_def_id=ab.account_def_id and a.doc_id=d.doc_id and a.card_id=c.card_id and d.cofirmation='T' and trunc(d.BUSSINES_DATE) <=trunc(:date_to)),0) outcombal,
+	TO_CHAR(:date_from, 'DD.MM.YYYY') as report_start,
+	TO_CHAR(:date_to, 'DD.MM.YYYY') as report_end,
+	ct.type_name type_name
+from accounting_balance ab, 
+account_def ad , cards c, card_types ct
+where 
+	ab.account_def_id=ad.account_def_id
+	and ab.card_id=c.card_id
+	and ab.account_def_id=nvl(:vtype,ab.account_def_id)
+	and ab.card_id=nvl(:code,ab.card_id)
+	and ct.card_type_id=c.card_type_id
+	and ct.type_name in (:ctypes)
+	and upper(c.last_name||' '||c.first_name) like upper('%'||:gname||'%')
+	) a where ((:noused=1 and (a.credbal<>0 or a.debbal<>0 or a.outcombal<>0)) or :noused=0) and ((:mov=1 and (a.credbal<>0 or a.debbal<>0)) or :mov=0)]]>
+         </sql>
+         <input id="ur" value="${ur}" dataType="xsd:string"/>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+         <input id="vtype" value="${vtype}" dataType="xsd:integer"/>
+         <input id="code" value="${code}" dataType="xsd:string"/>
+         <input id="ctypes" value="${ctypes}" dataType="xsd:string"/>
+         <input id="gname" value="${gname}" dataType="xsd:string"/>
+         <input id="noused" value="${noused}" dataType="xsd:integer"/>
+         <input id="mov" value="${mov}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="ParamSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:date_from, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:date_to, 'DD.MM.YYYY') as report_end,
+(:vtype) vtype,
+(:code) code,
+(:gname) gname,
+(case when (:mov) = 0 then 'No' else 'Yes' end) mov,
+(case when (:noused) = 0 then 'No' else 'Yes' end) noused
+from dual]]>
+         </sql>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+         <input id="vtype" value="${vtype}" dataType="xsd:integer"/>
+         <input id="code" value="${code}" dataType="xsd:string"/>
+         <input id="gname" value="${gname}" dataType="xsd:string"/>
+         <input id="mov" value="${mov}" dataType="xsd:integer"/>
+         <input id="noused" value="${noused}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <ParamSet>
+                  <nodeList dataSet="ParamSet" select="/ROWSET/PARAMSET_ROW"/>
+               </ParamSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="vtype_list">
+         <sql>
+            <![CDATA[select account_code , account_def_id from account_def]]>
+         </sql>
+      </valueSet>
+      <valueSet id="YN">
+         <sql>
+            <![CDATA[select 'N',0 from dual
+union all
+select 'Y',1 from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="ctype">
+         <sql>
+            <![CDATA[select type_name from card_types order by type_name]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="vtype" defaultValue="1" dataType="xsd:integer">
+         <select label="Account: " valueSet="vtype_list" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="code">
+         <input label="Guest id: "/>
+      </parameter>
+      <parameter id="gname">
+         <input label="Guest name: "/>
+      </parameter>
+      <parameter id="mov" dataType="xsd:integer">
+         <select label="Hide 0 Move: " valueSet="YN" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="noused" dataType="xsd:integer">
+         <select label="Hide Not Used: " valueSet="YN" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="date_from" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="Period from: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="date_to" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Period till: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="ctypes">
+         <select label="Card Type: " valueSet="ctype" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="ur" defaultValue="/xmlpserver/Reports/01 Accounts/0102 Account balance detailed/0102 Account balance detailed.xdo?_xpf=&amp;_xpt=0&amp;_xdo=%2FReports%2F01%20Accounts%2F0102%20Account%20balance%20detailed%2F0102%20Account%20balance%20detailed.xdo"/>
+   </parameters>
+   <templates default="accountBalanceEn">
+      <template label="accountBalanceEn" type="rtf" url="accountBalanceEn.rtf"/>
+      <template label="accountBalanceRu" type="rtf" url="accountBalanceRu.rtf"/>
+   </templates>
+   <burst enabled="false">
+      <property name="BURSTING_NODE" value="/DATA"/>
+      <property name="DELIVERY_KEY" value="/DATA"/>
+   </burst>
+</report>

@@ -1,0 +1,157 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0506 Revenue report by RVC group</title>
+   <description>HRS TNG3 report 0506 Revenue report by RVC group</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="data">
+      <dataSet id="data">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    ins.rvcname,
+    ins.subscription_name,
+    ins.si,
+    ins.fgrp,
+    (:d1) d1,
+    (:d2) d2,
+    sum(ins.count) count,
+    sum(ins.taxadd) taxadd,
+    sum(ins.taxvat) taxvat,
+    sum(ins.amount) amount
+from
+    (
+    select
+        '*' rvcname,
+        (:d1) d1,
+        (:d2) d2,
+        mii.name1 || ' - ' || mii.code as subscription_name,
+        si.name as si,
+        fgrp.name as fgrp,
+        sum(ia.mi_count) * -1 as count,
+        0 as TAXADD,
+        0 as TAXVAT,
+        sum(ia.value_ttl) * -1  as amount
+    from
+        item_accounting ia,
+        docs d,
+        menu_items mii,
+        subscription_accounting sa,
+        subscription_items si,
+        cards c,
+        menu_fgrp fgrp,
+        menu_si si,
+        rvc r,
+        rvc_group_link rgl
+    where
+        ia.doc_id = d.doc_id
+        and ia.card_id = c.card_id
+        and ia.subscription_accounting_id = sa.subscription_accounting_id
+        and ia.subscription_item_id = si.subscription_item_id
+        and mii.mi_id = si.dtl_mi_id
+        and mii.si = si.si_id
+        and mii.fgrp = fgrp.fgrp_id
+        and ia.value_ttl < 0
+        and d.bussines_date between :d1 and :d2
+        and d.check_open='F'
+        and d.cofirmation='T'
+        and r.rvc_id = d.RVC
+        and r.RVC_ID = rgl.RVC_ID
+        and rgl.RVC_GROUP_ID in (:pRVC)
+        and r.site_id in (:site_list)
+    group by
+        mii.name1 || ' - ' || mii.code,
+        si.name,
+        fgrp.name
+    union all
+
+    select
+        '*' rvcname,
+        (:d1) d1,
+        (:d2) d2,
+        DOCS_DTL.NAME || ' - ' || DOCS_DTL.MI_ID as subscription_name,
+        MENU_SI.NAME as si,
+        MENU_FGRP.NAME as fgrp,
+        SUM(DOCS_DTL.COUNT) as COUNT,
+        SUM(DOCS_DTL.TAX_ADD) as TAXADD,
+        SUM(DOCS_DTL.TAX_VAT) as TAXVAT,
+        SUM(DOCS_DTL.TTL-DOCS_DTL.DSC+DOCS_DTL.PAY_TTL_SUBSCR) as amount
+    from   MENU_FGRP MENU_FGRP,
+        MENU_SI MENU_SI,
+        DOCS_DTL DOCS_DTL,
+        DOCS DOCS,
+        rvc r2,
+        rvc_group_link rgl2
+    where   DOCS.DOC_ID=DOCS_DTL.DOC_ID
+            and  MENU_SI.SI_ID=DOCS_DTL.SI
+            and  MENU_FGRP.FGRP_ID=DOCS_DTL.FGRP
+            and trunc(docs.tm) between :d1 and :d2
+            and docs.check_open='F'
+            and docs.cofirmation='T'
+            and docs_dtl.pay_ttl_subscr=0
+            and docs_dtl.void_flag is null
+            and r2.RVC_ID = docs.RVC
+            and r2.RVC_ID = rgl2.RVC_ID
+            and rgl2.RVC_GROUP_ID in (:pRVC)
+            and r2.site_id in (:site_list)
+
+            GROUP BY DOCS_DTL.NAME || ' - ' || DOCS_DTL.MI_ID, DOCS_DTL.NAME,  MENU_SI.NAME, MENU_FGRP.NAME
+            
+            order by 2,3,1
+    ) ins
+
+group by
+    ins.rvcname,
+    ins.subscription_name,
+    ins.si,
+    ins.fgrp]]>
+         </sql>
+         <input id="d1" value="${d1}" dataType="xsd:date"/>
+         <input id="d2" value="${d2}" dataType="xsd:date"/>
+         <input id="pRVC" value="${pRVC}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="RVClist">
+         <sql>
+            <![CDATA[select name, rvc_group_id as rvcgrpid from rvc_group
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="pRVC">
+         <select label="RVC: " valueSet="RVClist" multiple="false" all="false" allValue="lov"/>
+      </parameter>
+      <parameter id="d1" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="d2" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="revenueEN">
+      <template label="revenueEN" type="rtf" url="revenueEn.rtf"/>
+      <template label="revenueRU" type="rtf" url="revenueRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

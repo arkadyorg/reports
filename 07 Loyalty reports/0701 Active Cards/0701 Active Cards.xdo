@@ -1,0 +1,82 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0701 Active Cards</title>
+   <description>HRS TNG3 report 0701 Active Cards</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+c.CARD_ID as cardid,
+ct.type_name as cttype,
+c.last_name||' '||c.first_name as gname,
+c.MAGSTRIPE as cardnum,
+sum(1) cards
+from cards c, card_types ct
+where c.IS_ARCHIVED = '0'
+and c.PROFILE_TYPE = 'P'
+and (c.VALID_TILL is null or c.VALID_TILL >= sysdate)
+and c.card_status_id = 1
+and ct.card_type_id = c.card_type_id
+and ct.type_name in (:ctype)
+
+group by
+
+c.CARD_ID,
+ct.type_name,
+c.last_name||' '||c.first_name,
+c.MAGSTRIPE 
+
+order by
+c.last_name||' '||c.first_name asc]]>
+         </sql>
+         <input id="ctype" value="${ctype}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+:ctype as cardTypeParam
+from dual]]>
+         </sql>
+         <input id="ctype" value="${ctype}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="ctype">
+         <sql>
+            <![CDATA[select type_name from card_types order by type_name]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="ctype">
+         <select label="Card Type" valueSet="ctype" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="activeCardsEn">
+      <template label="activeCardsEn" type="rtf" url="activeCardsEn.rtf"/>
+      <template label="activeCardsRu" type="rtf" url="activeCardsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

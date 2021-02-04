@@ -1,0 +1,84 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0203 Linked cards</title>
+   <description>HRS TNG3 report 0203 Linked cards</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	c.card_id,
+	c.CARD_TYPE_ID,
+	cct.type_name,
+	c.MAGSTRIPE,
+	c.LAST_NAME,
+	c.FIRST_NAME,
+	c.CREATED_DATE,
+	c.CREATED_PERSON,
+	c.gender,
+	c.BIRTH_DATE,
+	c.phone,
+	c.CELL_PHONE,
+	c.notes,
+
+		c.MASTER_CARD_ID mastercard,
+		cm.CARD_TYPE_ID mastertype,
+		cmct.type_name mastertypename,
+		cm.MAGSTRIPE mastermagstripe,
+		cm.LAST_NAME masterlast,
+		cm.FIRST_NAME masterfirst,
+		cm.CREATED_DATE mastercreated_date,
+		cm.CREATED_PERSON mastercreated_person,
+		cm.gender mastergender,
+		cm.BIRTH_DATE masterbd,
+		cm.phone masterphone,
+		cm.CELL_PHONE mastercell,
+		cm.notes masternotes
+
+from cards c, cards cm, card_types cct, card_types cmct
+
+where c.MASTER_CARD_ID is not null
+	and c.MASTER_CARD_ID=cm.card_id
+	and c.card_type_id=cct.card_type_id
+	and cm.card_type_id=cmct.card_type_id]]>
+         </sql>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date"/>
+   </parameters>
+   <templates default="linkedCardsEn">
+      <template label="linkedCardsEn" type="rtf" url="linkedCardsEn.rtf"/>
+      <template label="linkedCardsRu" type="rtf" url="linkedCardsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

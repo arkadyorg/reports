@@ -1,0 +1,237 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0208 Duplicate profiles</title>
+   <description>HRS TNG3 report 0208 Duplicate profiles</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[SELECT
+	cout.card_id,
+	cout.first_name,
+	cout.last_name,
+	cout.second_name,
+	cout.created_date,
+	cout.passport,
+	cout.phone,
+	cout.cell_phone,
+	cout.email,
+	cout.created_person,
+  --LISTAGG(cout.occur,', ') within group (order by cout.occur) occur
+  sum(cout.occur) rating
+FROM(
+
+		SELECT 
+			c.card_id,
+			c.LAST_NAME,
+			c.FIRST_NAME,
+			c.SECOND_NAME,
+			c.CREATED_DATE,
+			c.PASSPORT,
+			c.PHONE,
+			c.CELL_PHONE,
+			c.email,
+			c.CREATED_PERSON,
+			2 occur
+		FROM 
+		    cards c
+		WHERE 
+		    EXISTS 
+		(SELECT * FROM cards d WHERE c.last_name = d.last_name AND 
+		    (SUBSTR(c.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) = SUBSTR(d.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) 
+		    OR 
+		    d.FIRST_NAME IS NULL 
+		    OR 
+		    c.FIRST_NAME IS NULL) 
+		AND c.card_id <> d.card_id
+		)   
+union all
+
+		SELECT 
+			c.card_id,
+			c.LAST_NAME,
+			c.FIRST_NAME,
+			c.SECOND_NAME,
+			c.CREATED_DATE,
+			c.PASSPORT,
+			c.PHONE,
+			c.CELL_PHONE,
+			c.email,
+			c.CREATED_PERSON,
+			1 occur
+		FROM 
+		    cards c
+		WHERE 
+		    EXISTS 
+		(SELECT * FROM cards d WHERE c.last_name = d.last_name AND 
+		    (SUBSTR(c.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) = SUBSTR(d.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) 
+		    OR 
+		    d.FIRST_NAME IS NULL 
+		    OR 
+		    c.FIRST_NAME IS NULL) 
+    	and (c.second_name = d.second_name)
+		AND c.card_id <> d.card_id
+		)
+union all
+
+		SELECT 
+			c.card_id,
+			c.LAST_NAME,
+			c.FIRST_NAME,
+			c.SECOND_NAME,
+			c.CREATED_DATE,
+			c.PASSPORT,
+			c.PHONE,
+			c.CELL_PHONE,
+			c.email,
+			c.CREATED_PERSON,
+			1 occur
+		FROM 
+		    cards c
+		WHERE 
+		    EXISTS 
+		(SELECT * FROM cards d WHERE (upper(REPLACE(c.passport, ' ', '')) = upper(REPLACE(d.passport, ' ', '')))
+		AND c.card_id <> d.card_id
+		)
+
+union all
+
+		SELECT 
+			c.card_id,
+			c.LAST_NAME,
+			c.FIRST_NAME,
+			c.SECOND_NAME,
+			c.CREATED_DATE,
+			c.PASSPORT,
+			c.PHONE,
+			c.CELL_PHONE,
+			c.email,
+			c.CREATED_PERSON,
+			1 occur
+		FROM 
+		    cards c
+		WHERE 
+		    EXISTS 
+		(SELECT * FROM cards d WHERE c.last_name = d.last_name AND 
+		    (SUBSTR(c.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) = SUBSTR(d.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) 
+		    OR 
+		    d.FIRST_NAME IS NULL 
+		    OR 
+		    c.FIRST_NAME IS NULL) 
+    	and (c.phone = d.phone)
+		AND c.card_id <> d.card_id
+		)
+
+union all
+
+		SELECT 
+			c.card_id,
+			c.LAST_NAME,
+			c.FIRST_NAME,
+			c.SECOND_NAME,
+			c.CREATED_DATE,
+			c.PASSPORT,
+			c.PHONE,
+			c.CELL_PHONE,
+			c.email,
+			c.CREATED_PERSON,
+			1 occur
+		FROM 
+		    cards c
+		WHERE 
+		    EXISTS 
+		(SELECT * FROM cards d WHERE c.last_name = d.last_name AND 
+		    (SUBSTR(c.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) = SUBSTR(d.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) 
+		    OR 
+		    d.FIRST_NAME IS NULL 
+		    OR 
+		    c.FIRST_NAME IS NULL) 
+    	and (c.cell_phone = d.cell_phone)
+		AND c.card_id <> d.card_id
+		)
+
+union all
+
+		SELECT 
+			c.card_id,
+			c.LAST_NAME,
+			c.FIRST_NAME,
+			c.SECOND_NAME,
+			c.CREATED_DATE,
+			c.PASSPORT,
+			c.PHONE,
+			c.CELL_PHONE,
+			c.email,
+			c.CREATED_PERSON,
+			1 occur
+		FROM 
+		    cards c
+		WHERE 
+		    EXISTS 
+		(SELECT * FROM cards d WHERE c.last_name = d.last_name AND 
+		    (SUBSTR(c.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) = SUBSTR(d.FIRST_NAME, 1, LEAST(LENGTH(c.FIRST_NAME),LENGTH(d.FIRST_NAME))) 
+		    OR 
+		    d.FIRST_NAME IS NULL 
+		    OR 
+		    c.FIRST_NAME IS NULL) 
+    	and (upper(REPLACE(c.email, ' ', '')) = upper(REPLACE(d.email, ' ', '')))
+		AND c.card_id <> d.card_id
+		)
+    
+) cout
+
+--where cout.card_id in (5525,5505)
+
+group by
+	cout.card_id,
+  cout.first_name,
+	cout.last_name,
+	cout.second_name,
+	cout.created_date,
+	cout.passport,
+	cout.phone,
+	cout.cell_phone,
+	cout.email,
+	cout.created_person
+
+order by 
+	cout.last_name]]>
+         </sql>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters/>
+   <templates default="duplicatesEn">
+      <template label="duplicatesEn" type="rtf" url="duplicatesEn.rtf"/>
+      <template label="duplicatesRu" type="rtf" url="duplicatesRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

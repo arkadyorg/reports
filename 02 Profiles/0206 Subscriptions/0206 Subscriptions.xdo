@@ -1,0 +1,131 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0206 Subscriptions</title>
+   <description>HRS TNG3 report 0206 Subscriptions</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="New DataSet 1">
+      <dataSet id="New DataSet 1">
+         <sql fixedSchema="false">
+            <![CDATA[select	 
+	CARDS.CARD_ID as CARD_ID,
+	ct.type_name,
+	nvl(SUBSCRIPTION_ACCOUNTING.price,0) price,
+	nvl((:subscr),'All') headsubscr,
+	nvl((:dtl_mi_id), 'All') headdtl_mi_id,
+	TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+	cards.last_name || ' ' || cards.first_name || ' ' || cards.second_name as full_name,
+	SUBSCRIPTION_ACCOUNTING.ISSUE_DATE as ISSUE_DATE,
+	SUBSCRIPTION_ACCOUNTING.MMSHP_START_DATE,
+	SUBSCRIPTION_ACCOUNTING.MMSHP_END_DATE,
+	SUBSCRIPTION_ACCOUNTING.EXPIRATION_DATE as EXPIRATION_DATE,
+	SUBSCRIPTION_ACCOUNTING.STATUS as STATUS,
+	decode(SUBSCRIPTION_ACCOUNTING.STATUS, 
+			1, 'Inactive',
+			2, 'Active',
+			3, 'Frozen',
+			4, 'Exhausted',
+			5, 'Expired',
+			6, 'Cancelled'
+			) as status_text,
+	MENU_ITEMS.NAME1 as SUBSCR_NAME,
+	MENU_ITEMS_1.NAME1 as ITEM_NAME,
+	ITEM_BALANCE.COUNT as ITEM_COUNT,
+	ITEM_BALANCE.INIT_COUNT as INIT_COUNT,
+	(ITEM_BALANCE.INIT_COUNT - ITEM_BALANCE.COUNT) charged,
+	holds.holdtxt,
+	subal.leftr
+ 
+from 
+	SUBSCRIPTION_ITEMS SUBSCRIPTION_ITEMS,
+	MENU_ITEMS MENU_ITEMS_1,
+	ITEM_BALANCE ITEM_BALANCE,
+	MENU_ITEMS MENU_ITEMS,
+	SUBSCRIPTION_ACCOUNTING SUBSCRIPTION_ACCOUNTING,
+	CARDS CARDS,
+	CARD_TYPES CT,
+
+	(select 
+		sah.SUBSCRIPTION_ACCOUNTING_ID,
+		LISTAGG(to_char(to_char(sah.POST_DATE, 'DD.MM.YYYY HH24:MM')||' ('||sah.POST_EMPL||') '||sah.DATE_START||' - '||sah.DATE_END||' "'||sah.REFERENCE)||'"', ';  ') WITHIN GROUP (ORDER BY sah.SA_HOLD_ID) holdtxt
+		from sa_holds sah, SUBSCRIPTION_ACCOUNTING sa, cards c
+		where sah.SUBSCRIPTION_ACCOUNTING_ID=sa.SUBSCRIPTION_ACCOUNTING_ID
+		and sa.card_id=c.card_id
+		and sah.DELETE_DATE is null
+		group by
+		sah.SUBSCRIPTION_ACCOUNTING_ID)holds,
+	(select
+		ia.SUBSCRIPTION_ACCOUNTING_ID,
+		round(sum(ia.VALUE_TTL),2) leftr
+		from item_accounting ia
+		group by
+		ia.SUBSCRIPTION_ACCOUNTING_ID)subal
+
+
+where CARDS.CARD_ID=SUBSCRIPTION_ACCOUNTING.CARD_ID
+and SUBSCRIPTION_ACCOUNTING.SUBSCRIPTION_MI_ID=MENU_ITEMS.MI_ID
+and ITEM_BALANCE.SUBSCRIPTION_ACCOUNTING_ID=SUBSCRIPTION_ACCOUNTING.SUBSCRIPTION_ACCOUNTING_ID
+and ITEM_BALANCE.SUBSCRIPTION_ITEM_ID=SUBSCRIPTION_ITEMS.SUBSCRIPTION_ITEM_ID
+and SUBSCRIPTION_ITEMS.DTL_MI_ID=MENU_ITEMS_1.MI_ID
+and MENU_ITEMS.NAME1=nvl(:subscr,MENU_ITEMS.NAME1)
+and ITEM_BALANCE.COUNT > 0
+and SUBSCRIPTION_ACCOUNTING.STATUS in (1,2,3)
+and SUBSCRIPTION_ITEMS.DTL_MI_ID=nvl(:dtl_mi_id, SUBSCRIPTION_ITEMS.DTL_MI_ID)
+and cards.card_type_id = ct.card_type_id
+and holds.SUBSCRIPTION_ACCOUNTING_ID(+)=SUBSCRIPTION_ACCOUNTING.SUBSCRIPTION_ACCOUNTING_ID
+and SUBSCRIPTION_ACCOUNTING.SUBSCRIPTION_ACCOUNTING_ID = subal.SUBSCRIPTION_ACCOUNTING_ID
+
+
+order by 
+	MENU_ITEMS.NAME1, 
+	cards.last_name || ' ' || cards.first_name || ' ' || cards.second_name, 
+	MENU_ITEMS_1.NAME1]]>
+         </sql>
+         <input id="subscr" value="${subscr}" dataType="xsd:string"/>
+         <input id="dtl_mi_id" value="${dtl_mi_id}" dataType="xsd:string"/>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="Sunscriptions">
+         <sql>
+            <![CDATA[select	 
+	 distinct MENU_ITEMS.NAME1 as SUBSCR_NAME
+ from	MENU_ITEMS MENU_ITEMS,
+	 SUBSCRIPTION_ACCOUNTING SUBSCRIPTION_ACCOUNTING
+ where   
+ 	 SUBSCRIPTION_ACCOUNTING.SUBSCRIPTION_MI_ID=MENU_ITEMS.MI_ID
+ and   SUBSCRIPTION_ACCOUNTING.STATUS in (1,2,3)
+ order by MENU_ITEMS.NAME1]]>
+         </sql>
+      </valueSet>
+      <valueSet id="subs items">
+         <sql>
+            <![CDATA[select distinct m.name1, i.dtl_mi_id
+from menu_items m, subscription_items i
+where i.dtl_mi_id = m.mi_id
+order by m.name1]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="subscr">
+         <select label="Subscription: " valueSet="Sunscriptions" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="dtl_mi_id">
+         <select label="Item: " valueSet="subs items" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="subscriptionsEN">
+      <template label="subscriptionsEN" type="rtf" url="subscriptionsEn.rtf"/>
+      <template label="subscriptionsRU" type="rtf" url="subscriptionsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

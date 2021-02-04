@@ -1,0 +1,85 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>9904 User login history</title>
+   <description>HRS TNG3 report 9904 User login history</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+lh.tm,
+lh.EMPL_ID,
+e.name2||' '||e.name1 fio,
+lh.event,
+lh.WORKSTATION
+from login_history lh, employees e
+where lh.EMPL_ID=e.empl_id
+and lh.empl_id in (:employlist)
+and trunc(lh.TM) between trunc(:datar) and trunc(:daten)]]>
+         </sql>
+         <input id="employlist" value="${employlist}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+(select listagg(to_char(name2||' '||name1), ',') within group (order by name2||' '||name1)  from employees where name2||' '||name1 in (:employlist)) hemplist
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="employlist" value="${employlist}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="emplist">
+         <sql>
+            <![CDATA[select
+name2||' '||name1, empl_id
+from employees e]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="employlist">
+         <select label="Employee: " valueSet="emplist" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="userLoginHistoryEN">
+      <template label="userLoginHistoryEN" type="rtf" url="userLoginHistoryEN.rtf"/>
+      <template label="userLoginHistoryByUserEN" type="rtf" url="userLoginHistoryByUserEN.rtf"/>
+      <template label="userLoginHistoryByUserRU" type="rtf" url="userLoginHistoryByUserRU.rtf"/>
+      <template label="userLoginHistoryRU" type="rtf" url="userLoginHistoryRU.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

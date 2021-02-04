@@ -1,0 +1,447 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0502 Check payment items</title>
+   <description>HRS TNG3 report 0502 Check payment items</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+mainselect.doc_id ,
+mainselect.chknum ,
+mainselect.tm ,
+mainselect.BUSSINES_DATE ,
+mainselect.rvc ,
+mainselect.name ,
+mainselect.dttl ,
+mainselect.paydet ,
+mainselect.def_card_id ,
+mainselect.fio ,
+mainselect.DTL_SEQ ,
+mainselect.itemname ,
+mainselect.count ,
+mainselect.realddttl ,
+mainselect.si ,
+mainselect.siname ,
+mainselect.fgrp ,
+mainselect.fgNAME ,
+mainselect.ddtm ,
+mainselect.dsc ,
+mainselect.DSC_REASON ,
+mainselect.comemplid ,
+mainselect.executor ,
+mainselect.doctype 
+
+from
+(select
+	d.doc_id,
+	d.chknum,
+	d.tm,
+	d.BUSSINES_DATE,
+	d.rvc,
+	r.name,
+	d.ttl dttl,
+	listpay.paydet,
+	d.def_card_id,
+	c.last_name||' '||c.FIRST_NAME fio, --new
+	dd.DTL_SEQ,
+	to_char(dd.name) itemname,
+	dd.count,
+	dd.ttl-dd.dsc+dd.pay_ttl_subscr realddttl,
+	dd.si,
+	to_char(msi.name) siname,
+	dd.fgrp,
+	to_char(mfg.NAME) fgNAME,
+	to_char(dd.tm) ddtm,
+	dd.dsc,
+	dd.DSC_REASON,
+	to_char(dd.COMISSION_EMPL_ID) comemplid, --new
+	to_char(e.NAME2||' '||e.name1) executor,
+	'c' doctype
+
+
+
+from DOCS d, docs_dtl dd, employees e, cards c, MENU_SI msi, MENU_FGRP mfg, rvc r, 
+	(
+		select
+		d.doc_id,
+		--d.chknum,
+		LISTAGG(to_char(dp.TM_NAME||':'||dp.amount), '; ') WITHIN GROUP (ORDER BY dp.amount)PAYDET
+		from DOCS d, docs_paym dp
+		where 
+		d.doc_id = dp.doc_id
+		and dp.TM_ID in (select tm.id from TENDERMEDIA tm)
+		and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+		and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+		and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+		and d.cofirmation='T'
+		and d.check_open='F'
+        and dp.tm_id in (:tendermedia)-- DPAD
+		group by
+		d.doc_id
+		)listpay
+
+where 
+	d.doc_id = dd.doc_id
+	and dd.COMISSION_EMPL_ID=e.empl_id
+	and d.def_card_id = c.card_id
+	and d.doc_id=listpay.doc_id
+	and dd.si=msi.SI_ID
+	and dd.fgrp=mfg.FGRP_ID
+	and d.rvc = r.rvc_id
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+	and d.cofirmation='T'
+	and d.check_open='F'
+	and dd.void_flag is null
+    and r.site_id in (:site_list)
+  
+  
+  
+  union all
+  
+  
+select ---------------------------------------------------------------START DEPOSIT SECTION
+	d.doc_id,
+	d.CHKNUM,
+	d.tm,
+	d.BUSSINES_DATE,
+	d.rvc,
+	r.name,
+	d.ttl dttl,
+	to_char(dp.tm_name||': '||dp.AMOUNT) paydet,
+	d.DEF_CARD_ID,
+	c.last_name||' '||c.FIRST_NAME,
+	0 dtl_seq,
+	'deposit operation' itemname,
+	0 count,
+	dp.AMOUNT realddttl,
+	'' si,
+	'' siname,
+	'' fgrp,
+	'' fgname,
+	'' ddtm,
+	0 dsc,
+	'' dsc_reason, 
+	'' COMISSION_EMPL_ID,
+	d.OPERATOR executor,
+	'd' doctype
+
+from docs d, docs_paym dp, accounting a, account_def ad, rvc r, cards c
+
+where d.doc_id=dp.doc_id
+	and dp.TM_ID in (select tm.id from TENDERMEDIA tm)
+	and d.doc_id=a.doc_id
+	and d.def_card_id=c.card_id
+	and a.account_def_id = ad.account_def_id
+	and d.rvc=r.rvc_id
+	and ad.account_type='M'
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+	and d.doc_type = 'D'
+    and r.site_id in (:site_list)
+    and dp.tm_id in (:tendermedia)-- DPAD
+	---------------------------------------------------------------END DEPOSIT SECTION
+
+
+
+	union all
+
+select ---------------------------------------------------------------START VOUCHER SECTION
+	d.doc_id,
+	d.CHKNUM,
+	d.tm,
+	d.BUSSINES_DATE,
+	d.rvc,
+	r.name,
+	d.ttl dttl,
+	to_char(dp.tm_name||': '||dp.AMOUNT) paydet,
+	d.DEF_CARD_ID,
+	c.last_name||' '||c.FIRST_NAME,
+	0 dtl_seq,
+	v.code||' voucher operation' itemname,
+	0 count,
+	dp.AMOUNT realddttl,
+	'' si,
+	'' siname,
+	'' fgrp,
+	'' fgname,
+	'' ddtm,
+	0 dsc,
+	'' dsc_reason, 
+	'' COMISSION_EMPL_ID,
+	d.OPERATOR executor,
+	'v' doctype
+
+from docs d, docs_paym dp, voucher_accounting va, rvc r, cards c, voucher v
+
+where d.doc_id=dp.doc_id
+	and dp.TM_ID in (select tm.id from TENDERMEDIA tm)
+	and d.doc_id=va.doc_id
+	and va.VOUCHER_ID = v.voucher_id
+	and d.def_card_id=c.card_id
+	and d.rvc=r.rvc_id
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+	and d.doc_type = 'D'
+    and r.site_id in (:site_list)
+    and dp.tm_id in (:tendermedia)-- DPAD
+	---------------------------------------------------------------END VOUCHER SECTION
+  )mainselect
+
+where mainselect.doctype in (:doctypeparam)
+and abs(mainselect.count) = decode(:chk,1,mainselect.count*1,-1,mainselect.count*-1,abs(mainselect.count))]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+         <input id="tendermedia" value="${tendermedia}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+         <input id="doctypeparam" value="${doctypeparam}" dataType="xsd:string"/>
+         <input id="chk" value="${chk}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+nvl((select name from rvc_group where rvc_group_id = (:rvcgroup)),'All') rgroup,
+nvl((select name from rvc where rvc_id = (:rvcid)),'All') rvc
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="DataSet gtotal">
+         <sql fixedSchema="false">
+            <![CDATA[select
+dp.tm_name grandTMTTLname,
+sum(dp.AMOUNT) grandTTL
+from DOCS_PAYM dp
+
+where dp.doc_id in
+(
+select d.doc_id
+from docs d
+	where trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+	and d.cofirmation='T'
+	and d.check_open='F' 
+)
+
+and dp.TM_ID in (select tm.id from TENDERMEDIA tm)
+and dp.tm_id in (:tendermedia)-- DPAD
+and dp.doc_id in 
+				(
+				select
+				dt.doc_id from(
+
+
+				select
+					d.doc_id,
+					'c' doctype
+				from DOCS d, docs_dtl dd, employees e, cards c, MENU_SI msi, MENU_FGRP mfg, rvc r,
+					(
+						select
+						d.doc_id
+						from DOCS d, docs_paym dp
+						where 
+						d.doc_id = dp.doc_id
+						and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+						and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+						and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+						and d.cofirmation='T'
+						and d.check_open='F'
+                        and dp.tm_id in (:tendermedia)-- DPAD
+						group by
+						d.doc_id
+						)listpay
+
+				where 
+					d.doc_id = dd.doc_id
+					and dd.COMISSION_EMPL_ID=e.empl_id
+					and d.def_card_id = c.card_id
+					and d.doc_id=listpay.doc_id
+					and dd.si=msi.SI_ID
+					and dd.fgrp=mfg.FGRP_ID
+					and d.rvc = r.rvc_id
+					and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+					and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+					and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+					and d.cofirmation='T'
+					and d.check_open='F'
+					and dd.void_flag is null
+                    and r.site_id in (:site_list)
+				  
+				  
+				  
+				  union all
+				  
+				  
+				select ---------------------------------------------------------------START DEPOSIT SECTION
+					d.doc_id,
+					'd' doctype
+
+				from docs d, docs_paym dp, accounting a, account_def ad, rvc r, cards c
+
+				where d.doc_id=dp.doc_id
+					and d.doc_id=a.doc_id
+                    and dp.tm_id in (:tendermedia)-- DPAD
+					and d.def_card_id=c.card_id
+					and a.account_def_id = ad.account_def_id
+					and d.rvc=r.rvc_id
+					and ad.account_type='M'
+					and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+					and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+					and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+					and d.doc_type = 'D'
+                    and r.site_id in (:site_list)
+					---------------------------------------------------------------END DEPOSIT SECTION
+
+
+
+					union all
+
+				select ---------------------------------------------------------------START VOUCHER SECTION
+					d.doc_id,
+					'v' doctype
+
+				from docs d, docs_paym dp, voucher_accounting va, rvc r, cards c, voucher v
+
+				where d.doc_id=dp.doc_id
+					and d.doc_id=va.doc_id
+                    and dp.tm_id in (:tendermedia)-- DPAD
+					and va.VOUCHER_ID = v.voucher_id
+					and d.def_card_id=c.card_id
+					and d.rvc=r.rvc_id
+					and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+					and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+					and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+					and d.doc_type = 'D'
+                    and r.site_id in (:site_list)
+					---------------------------------------------------------------END VOUCHER SECTION
+				  ) dt
+				  where dt.doctype in (:doctypeparam)
+				)
+and abs(dp.AMOUNT) = decode(:chk,1,dp.AMOUNT*1,-1,dp.AMOUNT*-1,abs(dp.AMOUNT))
+group by dp.tm_name]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+         <input id="tendermedia" value="${tendermedia}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+         <input id="doctypeparam" value="${doctypeparam}" dataType="xsd:string"/>
+         <input id="chk" value="${chk}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet_gtotal>
+                  <nodeList dataSet="DataSet gtotal" select="/ROWSET/DATASET_GTOTAL_ROW"/>
+               </DataSet_gtotal>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="rvc_group">
+         <sql>
+            <![CDATA[select name, rvc_group_id as rvrcgroup from rvc_group
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="doctypeparamlist">
+         <sql>
+            <![CDATA[select 'Voucher','v' from dual
+union all
+select 'Deposit','d' from dual
+union all
+select 'Other','c' from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="checktype">
+         <sql>
+            <![CDATA[select 'Sale','1' from dual
+union all
+select 'Refund','-1' from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+      <valueSet id="tmlist">
+         <sql>
+            <![CDATA[select distinct
+dp.tm_name,
+dp.tm_id
+from docs_paym dp]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="rvcgroup" dataType="xsd:integer">
+         <select label="RVC group: " valueSet="rvc_group" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="rvcid" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvc" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="doctypeparam">
+         <select label="Document type: " valueSet="doctypeparamlist" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="chk" dataType="xsd:integer">
+         <select label="Check Type" valueSet="checktype" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="tendermedia">
+         <select label="Payment method: " valueSet="tmlist" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="checkPaymentItemsEn">
+      <template label="checkPaymentItemsEn" type="rtf" url="checkPaymentItemsEn.rtf"/>
+      <template label="checkPaymentItemsRu" type="rtf" url="checkPaymentItemsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

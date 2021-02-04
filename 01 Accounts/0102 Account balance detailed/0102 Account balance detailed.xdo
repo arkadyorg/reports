@@ -1,0 +1,154 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0102 Account balance detailed</title>
+   <description>HRS TNG3 report 0102 Account balance detailed</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="5"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="true"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="ParamSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:dStart, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:dEnd, 'DD.MM.YYYY') as report_end
+from dual]]>
+         </sql>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DATASET">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+	ACCOUNT_DEF.NAME as AccName,
+	cards.last_name||' '||cards.first_name||' '||cards.second_name||'('||cards.card_id||')' as GuestName,
+	card_types.type_name,
+	docs.TM  as TChkOpen,
+	TO_CHAR(docs.bussines_date, 'DD.MM.YYYY') as ChkOpen,
+	docs.chknum as Chknum,
+	nvl(docs.chCk_id,' ') as CHCKID,
+	replace(docs.image,'&','') as Image,
+	NVL(docs_dtl.name,'Deposit Top Up') as MiName,
+	NVL(Docs_dtl.count,1) as MiCount,
+	nvl(-1*(Docs_dtl.ttl - Docs_dtl.DSC + DOCS_DTL.PAY_TTL_SUBSCR),ACCOUNTING.AMOUNT) as MiTtl,
+	(case when nvl(-1*(Docs_dtl.ttl - Docs_dtl.DSC + DOCS_DTL.PAY_TTL_SUBSCR)*Docs_dtl.count,ACCOUNTING.AMOUNT) > 0 then  ACCOUNTING.AMOUNT else nvl((Docs_dtl.ttl - Docs_dtl.DSC + DOCS_DTL.PAY_TTL_SUBSCR)*Docs_dtl.count-1*(Docs_dtl.ttl - Docs_dtl.DSC + DOCS_DTL.PAY_TTL_SUBSCR)*Docs_dtl.count,ACCOUNTING.AMOUNT) end) as CredAcc,
+    (case when nvl(-1*(Docs_dtl.ttl - Docs_dtl.DSC + DOCS_DTL.PAY_TTL_SUBSCR)*Docs_dtl.count,ACCOUNTING.AMOUNT) < 0 then nvl(Docs_dtl.ttl - Docs_dtl.DSC + DOCS_DTL.PAY_TTL_SUBSCR,0) else 0 end) as DebAcc,
+	ACCOUNTING.loan_flag,
+	accounting_balance.amount as amount_b,
+	(select nvl(sum(ac.AMOUNT),0) from ACCOUNTING ac, docs d where ac.card_id=cards.card_id and ACCOUNT_DEF.ACCOUNT_DEF_ID= ac.ACCOUNT_DEF_ID and ac.doc_id=d.doc_id and d.bussines_date < :dStart and d.cofirmation='T' ) as balance_before,
+	--,(select nvl(sum(ac.AMOUNT),0) from ACCOUNTING ac, docs d where ac.card_id=cards.card_id and ACCOUNT_DEF.ACCOUNT_DEF_ID= ac.ACCOUNT_DEF_ID and ac.doc_id=d.doc_id and d.bussines_date <= :dEnd+1) as balance_after,
+	(select nvl(sum(ac.AMOUNT),0) from ACCOUNTING ac, docs d where ac.card_id=cards.card_id and ACCOUNT_DEF.ACCOUNT_DEF_ID= ac.ACCOUNT_DEF_ID and ac.doc_id=d.doc_id and d.bussines_date<=:dEnd and d.cofirmation='T') as balance_now
+	--,sum(ACCOUNTING.AMOUNT)
+from
+ACCOUNT_DEF
+, Accounting
+, accounting_balance
+, cards
+, card_types
+, docs
+
+LEFT join docs_dtl on (docs.doc_id=docs_dtl.doc_id)
+where
+	ACCOUNT_DEF.ACCOUNT_DEF_id=Accounting.ACCOUNT_DEF_id
+	and cards.card_id = Accounting.card_id
+	and (Accounting.amount <> 0 or( Accounting.amount = 0 and Accounting.ACCOUNT_DEF_ID = 241))
+	and cards.card_id = accounting_balance.card_id
+	and ACCOUNT_DEF.ACCOUNT_DEF_ID= accounting_balance.ACCOUNT_DEF_ID
+	and Accounting.doc_id=docs.doc_id
+	and cards.last_name like '%'||:InGuesName||'%'
+	and LOWER(cards.last_name||' '||cards.first_name||' '||cards.second_name||'('||cards.card_id||')') like LOWER(nvl('%'||:InGuesName||'%', cards.last_name||' '||cards.first_name||' '||cards.second_name||'('||cards.card_id||')'))
+	and cards.card_id = nvl(:InIdCard,cards.card_id )
+	and ACCOUNT_DEF.account_def_id = nvl(:selAccount, ACCOUNT_DEF.account_def_id)
+	and docs.bussines_date between :dStart and :dEnd
+	and docs.cofirmation='T'
+    and docs.check_open='F'
+	and card_types.type_name in (:ctypes)
+	and docs.rvc in (:RVCcode, :RVCcode)
+	and cards.card_type_id = card_types.card_type_id
+	and (NVL(Docs_dtl.count,1) * nvl(-1*(Docs_dtl.ttl - Docs_dtl.DSC + DOCS_DTL.PAY_TTL_SUBSCR),ACCOUNTING.AMOUNT)) * :report_type >= 0
+order by docs.bussines_date]]>
+         </sql>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+         <input id="InIdCard" value="${InIdCard}" dataType="xsd:integer"/>
+         <input id="selAccount" value="${selAccount}" dataType="xsd:integer"/>
+         <input id="ctypes" value="${ctypes}" dataType="xsd:string"/>
+         <input id="RVCcode" value="${RVCcode}" dataType="xsd:string"/>
+         <input id="report_type" value="${report_type}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <ParamSet>
+                  <nodeList dataSet="ParamSet" select="/ROWSET/PARAMSET_ROW"/>
+               </ParamSet>
+               <DATASET>
+                  <nodeList dataSet="DATASET" select="/ROWSET/DATASET_ROW"/>
+               </DATASET>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="Accounts">
+         <sql>
+            <![CDATA[select account_code||' - '||name, account_def_id
+from account_def
+--where account_def_id in (309, 1, 302)
+order by account_code]]>
+         </sql>
+      </valueSet>
+      <valueSet id="Report types">
+         <nvPairs>
+            <nvPair label="All data" value="0"/>
+            <nvPair label="Only Income" value="1"/>
+            <nvPair label="Only redemption" value="-1"/>
+         </nvPairs>
+      </valueSet>
+      <valueSet id="RVC">
+         <sql>
+            <![CDATA[select name,rvc_id from rvc order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="ctype">
+         <sql>
+            <![CDATA[select type_name from card_types order by type_name]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="dStart" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="dEnd" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Till date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="InIdCard" dataType="xsd:integer">
+         <input label="Guest Id: "/>
+      </parameter>
+      <parameter id="selAccount" dataType="xsd:integer">
+         <select label="Account: " valueSet="Accounts" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="report_type" defaultValue="0" dataType="xsd:integer">
+         <select label="Show: " valueSet="Report types" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="RVCcode" dataType="xsd:string">
+         <select label="RVC: " valueSet="RVC" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="ctypes">
+         <select label="Card Type: " valueSet="ctype" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="Client account detailedEn">
+      <template label="Client account detailedEn" type="rtf" url="accountBalanceDetailedEn.rtf"/>
+      <template label="Client account detailedRu" type="rtf" url="accountBalanceDetailedRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

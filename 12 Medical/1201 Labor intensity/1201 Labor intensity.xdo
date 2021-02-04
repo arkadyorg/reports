@@ -1,0 +1,96 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1201 Labor intensity</title>
+   <description>HRS TNG3 report 1201 Labor intensity</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+dd.name,
+d.tm,
+dd.ttl,
+dd.COMISSION_EMPL_ID,
+ec.name2||' '||ec.name1 commempl,
+dd.POSTING_EMPL_ID,
+ep.name2||' '||ep.name1 postempl,
+d.rvc,
+r.name rvcname,
+d.CHKNUM,
+'('||d.def_card_id||') '||c.LAST_NAME||' '||c.FIRST_NAME fio,
+mi.mi_id miid,
+--mi.si,
+msi.name siname,
+--mi.fgrp,
+mfgrp.NAME fgname,
+nvl((select
+		mp.redeem_bonus
+		from menu_price mp
+		where mp.mi_id = mi.mi_id and trunc(d.tm) between nvl(trunc(mp.valid_from), TO_DATE('01.01.1983', 'dd.mm.yyyy') ) and nvl(trunc(mp.valid_till), TO_DATE('18.03.2263', 'dd.mm.yyyy')) and rownum=1
+		),0) bonus
+
+from docs_dtl dd, docs d, menu_items mi, employees ec, employees ep, rvc r, menu_si msi, menu_fgrp mfgrp, cards c
+
+where dd.doc_id=d.doc_id
+and d.cofirmation = 'T'
+and d.CHECK_OPEN = 'F'
+and dd.VOID_FLAG is null
+and dd.mi_id=mi.code
+and dd.COMISSION_EMPL_ID = ec.empl_id
+and dd.posting_empl_id = ep.empl_id
+and d.rvc = r.rvc_id
+and mi.si=msi.SI_ID
+and mi.fgrp=mfgrp.fgrp_id
+and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+and d.DEF_CARD_ID = c.card_id]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="Labor intensity EN">
+      <template label="Labor intensity EN" type="rtf" url="laborIntensityEn.rtf"/>
+      <template label="Labor intensity Ru" type="rtf" url="laborIntensityRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

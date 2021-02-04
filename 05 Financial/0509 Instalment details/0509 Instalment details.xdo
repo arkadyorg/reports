@@ -1,0 +1,151 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0509 Instalment details</title>
+   <description>HRS TNG3 report 0509 Instalment details</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    c.card_id,
+    ct.type_name,
+    c.LAST_NAME,
+    c.FIRST_NAME,
+    ad.name,
+    ab.AMOUNT balanceamount,
+    ab.LOAN,
+    ab.CRD_TTL,
+    a.SEQ,
+    a.amount,
+    a.EXPIRY_DATE,
+    a.LOAN_FLAG,
+    a.SUBSCRIPTION_ACCOUNTING_ID,
+    sa.ISSUE_DATE,
+    sa.MMSHP_START_DATE,
+    sa.MMSHP_END_DATE,
+    sa.DOC_ID,
+    sa.REF_NUM,
+    sa.NOTE,
+    sa.SUBSCRIPTION_MI_ID,
+    mi.name1,
+    d.CHKNUM,
+    d.BUSSINES_DATE,
+    d.ttl
+
+
+
+from cards c, accounting_balance ab, ACCOUNT_DEF ad, accounting a, docs d, subscription_accounting sa, menu_items mi, card_types ct
+
+where 
+    c.CARD_ID = ab.CARD_ID
+    and ab.ACCOUNT_DEF_ID=ad.ACCOUNT_DEF_ID
+    and ad.ACCOUNT_CODE = 'MMSHP'
+    and c.card_id=a.card_id
+    and ad.account_def_id=a.account_def_id
+    and a.doc_id = d.doc_id
+    and d.COFIRMATION = 'T' and d.CHECK_OPEN = 'F'
+    and a.SUBSCRIPTION_ACCOUNTING_ID = sa.SUBSCRIPTION_ACCOUNTING_ID
+    and sa.SUBSCRIPTION_MI_ID = mi.mi_id
+    and c.CARD_TYPE_ID=ct.CARD_TYPE_ID
+    and a.EXPIRY_DATE is not null
+    and sa.status in (:substatus) -- param
+    and trunc(sa.MMSHP_START_DATE) between trunc(:datar) and trunc(:daten)
+--and trunc(a.EXPIRY_DATE) >= trunc(sysdate)]]>
+         </sql>
+         <input id="substatus" value="${substatus}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet short">
+         <sql fixedSchema="false">
+            <![CDATA[select
+c.card_id,
+c.LAST_NAME,
+c.FIRST_NAME,
+ab.amount balance,
+ab.LOAN due,
+ab.LAST_EXPIRY
+
+from accounting_balance ab, cards c
+where ab.SA_FLAG = 1
+and c.card_id = ab.card_id
+and (ab.amount <> 0 or ab.LOAN <> 0)]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet_short>
+                  <nodeList dataSet="DataSet short" select="/ROWSET/DATASET_SHORT_ROW"/>
+               </DataSet_short>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="substatlist">
+         <sql>
+            <![CDATA[select 'Null',0 from dual
+union all
+select 'Inactive',1 from dual
+union all
+select 'Active',2 from dual
+union all
+select 'Frozen',3 from dual
+union all
+select 'Exhausted',4 from dual
+union all
+select 'Expired',5 from dual
+union all
+select 'Cancelled',6 from dual
+union all
+select 'Moved',7 from dual
+union all
+select 'Closed',8 from dual
+union all
+select 'Reissued',9 from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="substatus">
+         <select label="Status: " valueSet="substatlist" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="instalmentsEn">
+      <template label="instalmentsEn" type="rtf" url="instalmentsEn.rtf"/>
+      <template label="instalmentsRu" type="rtf" url="instalmentsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

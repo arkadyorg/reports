@@ -1,0 +1,105 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0704 Covers by RVC</title>
+   <description>HRS TNG3 report 0704 Covers by RVC</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    r.name as rvc,
+    dp.TM_ID as tm,
+    case when dp.tm_id=15 then 'Room Charge' else 'Walk-IN' end as tmclass,
+    dp.tm_name as tmname,
+    sum(dtl.count) as covers,
+    sum(case when (to_char(d.tm,'hh:mm')>='04:00' and to_char(d.tm,'hh:mm')<'11:59') then dtl.count else 0 end) as si_brk,
+    sum(case when (to_char(d.tm,'hh:mm')>='12:00' and to_char(d.tm,'hh:mm')<'16:59') then dtl.count else 0 end) as si_lanch,
+    sum(case when (to_char(d.tm,'hh:mm')>='17:00' and to_char(d.tm,'hh:mm')<'23:59') then dtl.count else 0 end) as si_dinner,
+    sum(case when (to_char(d.tm,'hh:mm')>='00:00' and to_char(d.tm,'hh:mm')<'03:59') then dtl.count else 0 end) as si_night
+from docs d, docs_dtl dtl, cards c, card_types ct, docs_paym dp, rvc r
+where 
+    dtl.doc_id = d.DOC_ID
+    and r.RVC_ID=d.rvc
+    and c.CARD_ID = d.DEF_CARD_ID
+    and ct.CARD_TYPE_ID = c.CARD_TYPE_ID
+    and dp.DOC_ID=d.DOC_ID
+    and d.CHECK_OPEN = 'F'
+    and r.name in (:rvc)
+    and d.bussines_date between (:bdate_from) and (:bdate_to)
+    and d.rvc = r.rvc_id
+    and r.site_id in (:site_list)
+
+group by r.name, dp.tm_id, dp.TM_NAME]]>
+         </sql>
+         <input id="rvc" value="${rvc}" dataType="xsd:string"/>
+         <input id="bdate_from" value="${bdate_from}" dataType="xsd:date"/>
+         <input id="bdate_to" value="${bdate_to}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:bdate_from) datar,
+(:bdate_to) daten
+from dual]]>
+         </sql>
+         <input id="bdate_from" value="${bdate_from}" dataType="xsd:date"/>
+         <input id="bdate_to" value="${bdate_to}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name from rvc order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvc">
+         <select label="RVC: " valueSet="rvc" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="bdate_from" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="bdate_to" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yy"/>
+      </parameter>
+   </parameters>
+   <templates default="Covers by RVC En">
+      <template label="Covers by RVC En" type="rtf" url="coversByRVCEn.rtf"/>
+      <template label="Covers by RVC Ru" type="rtf" url="coversByRVCRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

@@ -1,0 +1,95 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0801 Composition cards</title>
+   <description>HRS TNG3 report 0801 Composition cards</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="items">
+         <sql fixedSchema="false">
+            <![CDATA[SELECT 
+mi.code as mi_code,
+mi.name1 as mi_name1, 
+nvl(mi.name2, mi.name1) as mi_name2,
+
+midtl.code as midtl_code, 
+midtl.name1 as midtl_name1, 
+nvl(midtl.name2, midtl.name1) as midtl_name2,
+micl.amount,
+inv_units_base.name as unit,
+nvl(midtl.cost/
+   (select unit_wgt from inv_units where inv_unit_id=midtl.base_inv_unit_id)*
+   micl.amount, 0) as cost,
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date1,
+(select value from system where param_name='CKPRN_H1') as property1
+
+FROM MENU_ITEMS MI, MI_CALC MICL, MENU_ITEMS MIDTL, 
+inv_units_base
+
+WHERE micl.mi_id = mi.mi_id
+and midtl.mi_id = micl.dtl_mi_id
+and inv_units_base.inv_units_base_id =  micl.inv_unit_id
+and (:sel_hier is null or :sel_hier = mi.hierarchy_id)
+order by mi.code, midtl.code]]>
+         </sql>
+         <input id="sel_hier" value="${sel_hier}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="header">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+(select value from system where param_name='CKPRN_H1') as property
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <items>
+                  <nodeList dataSet="items" select="/ROWSET/ITEMS_ROW"/>
+               </items>
+               <header>
+                  <nodeList dataSet="header" select="/ROWSET/HEADER_ROW"/>
+               </header>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="folders">
+         <sql>
+            <![CDATA[select  
+((select h1.name || ' - ' || h2.name from dictionary_hierarchy h1, dictionary_hierarchy h2
+where h2.hierarchy_id=dict.parent_id and h1.hierarchy_id=h2.parent_id
+) || ' - ' || dict.name || 
+' (' || (select count(*) from menu_items 
+where hierarchy_id=dict.hierarchy_id and mi_type=5) || ')') as folder,
+dict.hierarchy_id as sel_hier
+from dictionary_hierarchy dict
+where 
+dict.hierarchy_id 
+  in (select distinct(hierarchy_id) 
+  from menu_items where mi_type=5)
+order by folder]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="sel_hier" dataType="xsd:integer">
+         <select label="Folder: " valueSet="folders" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="compositionEN">
+      <template label="compositionEN" type="rtf" url="compositionEn.rtf"/>
+      <template label="compositionRU" type="rtf" url="compositionRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

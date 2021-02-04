@@ -1,0 +1,79 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0707 Trigger history</title>
+   <description>HRS TNG3 report 0707 Trigger history</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	CT.TYPE_NAME as TYPE_NAME,
+	C.CARD_ID as CARD_ID,
+	BTH.TS as TS,
+	BT.NAME as TRIGGER_NAME,
+	C.FIRST_NAME as FIRST_NAME,
+	C.SECOND_NAME as SECOND_NAME,
+	C.LAST_NAME as LAST_NAME,
+	C.LAST_NAME || ' ' || C.FIRST_NAME || ' ' || C.SECOND_NAME AS FULL_NAME
+	from
+	BONUS_TRIGGER_HISTORY BTH,
+	CARD_TYPES CT,
+	CARDS C,
+	BONUS_TRIGGERS BT
+where
+	BTH.CARD_ID=C.CARD_ID
+	and C.CARD_TYPE_ID=CT.CARD_TYPE_ID
+	and BT.BONUS_TRIGGER_ID=BTH.BONUS_TRIGGER_ID
+	and (BTH.TS between nvl(:StartRange,BTH.TS) and nvl(:EndRange,BTH.TS))
+	and trunc(bth.ts) between trunc(:datar) and trunc(:daten)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="triggersEn">
+      <template label="triggersEn" type="rtf" url="triggersEn.rtf"/>
+      <template label="triggersRu" type="rtf" url="triggersRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

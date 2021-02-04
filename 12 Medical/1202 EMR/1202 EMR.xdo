@@ -1,0 +1,185 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1202 EMR</title>
+   <description>HRS TNG3 report 1202 EMR</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="4"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="true"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="DataSet_s1">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="DataSet_s2">
+         <sql fixedSchema="false">
+            <![CDATA[select
+nvl(c.LAST_NAME,' ') last_name,
+nvl(c.FIRST_NAME,' ') first_name,
+nvl(c.SECOND_NAME,' ') second_name,
+nvl(to_char(c.BIRTH_DATE,'dd.MM.yyyy'),' ') birth_date,
+nvl(c.GENDER,' ') gender,
+nvl(c.COMPANY,' ') company,
+nvl(c.city,' ') city,
+nvl(c.STREET_ADDRESS,' ') street_address,
+nvl(c.phone,' ') phone,
+nvl(c.CELL_PHONE,' ') CELL_PHONE,
+nvl(c.email,' ') email,
+nvl(c.job_title,' ') job_title,
+nvl(c.country,' ') country,
+nvl(c.zip_code,' ') zipcode
+from cards c
+where c.card_id=(:card_id)]]>
+         </sql>
+         <input id="card_id" value="${card_id}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSet_s3">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	emr_r_t.PREFIX,
+	emr_r.NUM,
+	emr_r.DATE_OPEN regopen,
+	emr_r.DATE_CLOSE regclose,
+	--emr_r.OPEN_EMPLOYEE_ID,
+	regopen_emp.NAME2||' '||regopen_emp.NAME1 regopen_employee,
+	emrs.CARD_ID,
+	--emrs.EMPLOYEE_ID,
+	emr_emp.NAME2||' '||regopen_emp.NAME1 emr_employee,
+	c.LAST_NAME||' '||c.FIRST_NAME cname,
+	emr_r_t.NAME regname,
+	emr_t.name emrname,
+
+	emr_t_s.NAME section_name,
+	emr_t_f.NAME field_name,
+	--emr_v.VALUE,
+  nvl(replace(regexp_replace(emr_v.VALUE, '"|]',''),'['),' ') field_value,
+
+--Order section
+emrs.EMR_ID,
+to_char(emr_t_s.LIST_ORDER) sectionorder,
+to_char(emr_t_l.list_order) list_order
+
+from EMR_REGISTRIES emr_r, EMR_REGISTRY_TYPES emr_r_t, emrs emrs, EMR_VALUES emr_v, EMR_TEMPLATE_LINKS emr_t_l, emr_template_sections emr_t_s, EMR_TEMPLATE_FIELDS emr_t_f, EMR_TEMPLATES emr_t,
+cards c, employees regopen_emp, employees emr_emp
+
+where emr_r.CARD_ID = (:card_id)
+	and emr_r.EMR_REGTYPE_ID = emr_r_t.REGTYPE_ID
+	and emr_r.REGISTRY_ID = emrs.REGISTRY_ID
+	and emrs.card_id=c.card_id
+	and emrs.EMR_ID=emr_v.EMR_ID
+	and emr_v.EMR_SECTION_ID = emr_t_l.SECTION_ID
+	and emr_v.EMR_TFLINK_ID = emr_t_l.LINK_ID
+	and emr_t_l.SECTION_ID = emr_t_s.SECTION_ID
+	and emr_t_l.FIELD_ID=emr_t_f.FIELD_ID
+	and emrs.TEMPLATE_ID=emr_t.TEMPLATE_ID
+	and emr_r.OPEN_EMPLOYEE_ID = regopen_emp.EMPL_ID
+	and emrs.EMPLOYEE_ID = emr_emp.EMPL_ID
+	and emrs.emr_id in (:emrlist_menu)
+	and emr_t_s.section_id in (:emrsection_menu)]]>
+         </sql>
+         <input id="card_id" value="${card_id}" dataType="xsd:string"/>
+         <input id="emrlist_menu" value="${emrlist_menu}" dataType="xsd:string"/>
+         <input id="emrsection_menu" value="${emrsection_menu}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet_s1>
+                  <nodeList dataSet="DataSet_s1" select="/ROWSET/DATASET_S1_ROW"/>
+               </DataSet_s1>
+               <DataSet_s2>
+                  <nodeList dataSet="DataSet_s2" select="/ROWSET/DATASET_S2_ROW"/>
+               </DataSet_s2>
+               <DataSet_s3>
+                  <nodeList dataSet="DataSet_s3" select="/ROWSET/DATASET_S3_ROW"/>
+               </DataSet_s3>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="reg_list">
+         <sql>
+            <![CDATA[select
+emr_r_t.PREFIX||''||emr_r.NUM||' '||emr_r.DATE_OPEN||'-'||emr_r.DATE_CLOSE ddd,
+emr_r.REGISTRY_ID
+from EMR_REGISTRIES emr_r, EMR_REGISTRY_TYPES emr_r_t, cards c
+
+where emr_r.EMR_REGTYPE_ID = emr_r_t.regtype_id
+and emr_r.CARD_ID=c.card_id
+and emr_r.CARD_ID=(:card_id)]]>
+         </sql>
+         <input id="card_id" value="${card_id}" dataType="xsd:string"/>
+      </valueSet>
+      <valueSet id="emr_list">
+         <sql>
+            <![CDATA[select
+emr_t.name||' '||to_char(emrs.TIME_OPEN, 'dd.MM.yyyy HH24:mm') emrname_date,
+emrs.EMR_ID
+from emrs emrs, EMR_TEMPLATES emr_t
+where emrs.REGISTRY_ID = (:reglist_menu)
+and emrs.TEMPLATE_ID = emr_t.TEMPLATE_ID]]>
+         </sql>
+         <input id="reglist_menu" value="${reglist_menu}" dataType="xsd:string"/>
+      </valueSet>
+      <valueSet id="emr_section_list">
+         <sql>
+            <![CDATA[select
+	emrts.name,
+	emrts.sectionid
+from
+	(
+	select distinct
+		(case when emr_t_s.name = '' then '--- без названия ---'
+		when emr_t_s.name = ' ' then '--- без названия ---'
+		else to_char(emr_t_s.name) end
+		)name,
+	emr_t_s.SECTION_ID sectionid
+	from emr_values emr_v, emr_template_links emr_t_l, emr_template_sections emr_t_s
+	where emr_v.emr_id in (:emrlist_menu)
+	and emr_v.EMR_SECTION_ID = emr_t_l.SECTION_ID
+	and emr_v.EMR_TFLINK_ID = emr_t_l.LINK_ID
+	and emr_t_l.SECTION_ID = emr_t_s.SECTION_ID) emrts]]>
+         </sql>
+         <input id="emrlist_menu" value="${emrlist_menu}" dataType="xsd:string"/>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="card_id">
+         <input label="Client ID:" refreshParameters="true"/>
+      </parameter>
+      <parameter id="reglist_menu">
+         <select label="Registry: " valueSet="reg_list" multiple="false" all="false" allValue="null" refreshParameters="true"/>
+      </parameter>
+      <parameter id="emrlist_menu">
+         <select label="Registry entry: " valueSet="emr_list" multiple="true" all="true" allValue="lov" refreshParameters="true"/>
+      </parameter>
+      <parameter id="emrsection_menu">
+         <select label="Registry section:" valueSet="emr_section_list" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="EMREn">
+      <template label="EMRRu" type="rtf" url="EMRRu.rtf"/>
+      <template label="EMREn" type="rtf" url="EMREn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

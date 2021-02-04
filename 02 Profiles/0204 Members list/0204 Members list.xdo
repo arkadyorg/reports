@@ -1,0 +1,251 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0204 Members list</title>
+   <description>HRS TNG3 report 0204 Members list</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="MsL">
+      <dataSet id="MsL">
+         <sql fixedSchema="false">
+            <![CDATA[select
+sa.SUBSCRIPTION_ACCOUNTING_ID,
+'('||sa.card_id||') '||trim(c.last_name)||' '||trim(c.first_name) fio,
+sa.ISSUE_DATE,
+sa.EXPIRATION_DATE,
+decode(sa.IS_MEMBERSHIP,
+					1, 'Membersip',
+					0, 'Subscription',
+					'unknown') Type,
+decode(sa.status,
+				1, 'Inactive',
+				2, 'Active',
+				3, 'Frozen',
+				4, 'Exhausted',
+				5, 'Expired',
+				6, 'Cancelled',
+				7, 'Moved',
+				8, 'Closed',
+				9, 'Reissued',
+				'unknown') status,
+(select chknum from docs where docs.doc_id=sa.doc_id) chknum,
+(select to_char(tm, 'DD.MM.YY HH24:MI') from docs where docs.doc_id=sa.doc_id) tm,
+(select sum(aa.amount) from accounting aa where aa.SUBSCRIPTION_ACCOUNTING_id=sa.SUBSCRIPTION_ACCOUNTING_id) topay,
+(select sum(aa.amount) from accounting aa where aa.SUBSCRIPTION_ACCOUNTING_id=sa.SUBSCRIPTION_ACCOUNTING_id and aa.loan_flag='T') toloan,
+(select sum(aa.amount) from accounting_balance aa where aa.account_def_id=1 and aa.card_id=c.card_id) depo,
+sa.MMSHP_START_DATE,
+sa.MMSHP_END_DATE,
+mi.name1,
+
+subcurval.valuebalance,
+persman.managernames,
+e.NAME1||' '||e.name2 cashier, --6
+abs(ad.itemused) adused, --1 --active days used for period
+nvl(abs(fd.itemused),0) fdused, --2 --freeze days used
+abs(ad.valcount)+nvl(abs(fd.valcount),0) adfdvalcount, --3 --active days value amount
+onbalance.stabal, --4 --on start balance
+onbalance.stabal - (abs(ad.valcount)+nvl(abs(fd.valcount),0)) periodusedval --5 --used for period
+
+from 
+SUBSCRIPTION_ACCOUNTING sa ,menu_items mi,cards c, employees e,
+(select
+	ib.SUBSCRIPTION_ACCOUNTING_ID,
+	sum(ib.VALUE_TTL) valuebalance
+	from  item_balance ib
+	group by ib.SUBSCRIPTION_ACCOUNTING_ID) subcurval,
+
+(select
+	cea.card_id,
+	LISTAGG(to_char(acs.name||': '||e.name2||' '||e.name1), ', ') WITHIN GROUP (ORDER BY acs.name||': '||e.name2||' '||e.name1) managernames
+	from activity_skills acs, CARDS_EMPL_ASSGN cea, EMPLOYEES e
+	where acs.SKILL_ID=cea.SKILL_ID
+	and acs.RESOURCE_TYPE='CO'
+	and cea.EMPL_ID=e.empl_id
+	group by
+	cea.card_id)persman,
+ --=================================================================================================================================
+(select
+*
+from
+(select
+incount.SUBSCRIPTION_ACCOUNTING_ID,
+incount.itname,
+sum(incount.MI_COUNT) itemused,
+sum(incount.VALUE_TTL) valcount,
+incount.chpolicy,
+incount.counta-abs(sum(incount.MI_COUNT)) counta,
+incount.SUBSCRIPTION_ITEM_ID
+from
+
+(select
+	ia.SUBSCRIPTION_ITEM_ID,
+	ia.MI_COUNT,
+	ia.SUBSCRIPTION_ACCOUNTING_ID,
+	ia.VALUE_TTL,
+	d.BUSSINES_DATE,
+	si.LIMIT_COUNT,
+	si.count counta,
+	decode(si.CHARGE_POLICY, 1, 'AD',
+							2, 'FD',
+							si.CHARGE_POLICY) chpolicy,
+	mi.NAME1 itname
+
+from item_accounting ia, docs d, subscription_items si, menu_items mi
+
+where ia.doc_id=d.doc_id
+	and d.cofirmation = 'T'
+	and d.check_open='F'
+	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten) --2bparam
+	and ia.SUBSCRIPTION_ITEM_ID = si.SUBSCRIPTION_ITEM_ID
+	and si.DTL_MI_ID=mi.mi_id) incount
+
+where incount.chpolicy in ('AD','FD')
+
+group by
+incount.SUBSCRIPTION_ACCOUNTING_ID,
+incount.itname,
+incount.chpolicy,
+incount.counta,
+incount.SUBSCRIPTION_ITEM_ID) iinc
+where iinc.chpolicy = 'AD') ad,
+
+(select
+*
+from
+(select
+incount.SUBSCRIPTION_ACCOUNTING_ID,
+incount.itname,
+sum(incount.MI_COUNT) itemused,
+sum(incount.VALUE_TTL) valcount,
+incount.chpolicy,
+incount.counta-abs(sum(incount.MI_COUNT)) counta,
+incount.SUBSCRIPTION_ITEM_ID
+from
+
+(select
+	ia.SUBSCRIPTION_ITEM_ID,
+	ia.MI_COUNT,
+	ia.SUBSCRIPTION_ACCOUNTING_ID,
+	ia.VALUE_TTL,
+	d.BUSSINES_DATE,
+	si.LIMIT_COUNT,
+	si.count counta,
+	decode(si.CHARGE_POLICY, 1, 'AD',
+							2, 'FD',
+							si.CHARGE_POLICY) chpolicy,
+	mi.NAME1 itname
+
+from item_accounting ia, docs d, subscription_items si, menu_items mi
+
+where ia.doc_id=d.doc_id
+	and d.cofirmation = 'T'
+	and d.check_open='F'
+	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten) --2bparam
+	and ia.SUBSCRIPTION_ITEM_ID = si.SUBSCRIPTION_ITEM_ID
+	and si.DTL_MI_ID=mi.mi_id) incount
+
+where incount.chpolicy in ('AD','FD')
+
+group by
+incount.SUBSCRIPTION_ACCOUNTING_ID,
+incount.itname,
+incount.chpolicy,
+incount.counta,
+incount.SUBSCRIPTION_ITEM_ID) iinc
+where iinc.chpolicy = 'FD') fd,
+
+(select
+	ia.SUBSCRIPTION_ACCOUNTING_ID,
+	sum(ia.VALUE_TTL) stabal
+	from item_accounting ia, docs d
+	where ia.doc_id=d.doc_id
+	and d.COFIRMATION ='T'
+	and d.check_open='F'
+	and trunc(d.BUSSINES_DATE) <= trunc(:datar) --2b param
+
+group by 
+	ia.SUBSCRIPTION_ACCOUNTING_ID) onbalance
+--=================================================================================================================================
+where 
+sa.card_id=nvl(:cid, sa.card_id)
+and 
+c.card_id=persman.card_id(+)
+and sa.IS_MEMBERSHIP in (:type)
+and sa.SUBSCRIPTION_MI_ID = mi.mi_id
+and sa.card_id = c.card_id
+and sa.SUBSCRIPTION_ACCOUNTING_ID = onbalance.SUBSCRIPTION_ACCOUNTING_ID
+and sa.status in (:stat)
+and sa.SUBSCRIPTION_ACCOUNTING_ID = ad.SUBSCRIPTION_ACCOUNTING_ID(+)
+and sa.SUBSCRIPTION_ACCOUNTING_ID = fd.SUBSCRIPTION_ACCOUNTING_ID(+)
+and e.empl_id=sa.empl_id(+)
+and sa.SUBSCRIPTION_ACCOUNTING_ID = subcurval.SUBSCRIPTION_ACCOUNTING_ID (+)
+
+order by c.card_id]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="cid" value="${cid}" dataType="xsd:string"/>
+         <input id="type" value="${type}" dataType="xsd:string"/>
+         <input id="stat" value="${stat}" dataType="xsd:integer"/>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="type">
+         <sql>
+            <![CDATA[select 'Subscription',0  from dual
+Union All
+select  'Membership',1 from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="stat_list">
+         <sql>
+            <![CDATA[select 'Inactive',1  from dual
+Union All
+select 'Active',2  from dual
+Union All
+select 'Frozen',3  from dual
+Union All
+select 'Exhausted',4  from dual
+Union All
+select 'Expired',5  from dual
+Union All
+select 'Cancelled',6  from dual
+Union All
+select 'Moved',7  from dual
+Union All
+select 'Closed',8  from dual
+Union All
+select 'Reissued',9  from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="cid">
+         <input label="Client Id: "/>
+      </parameter>
+      <parameter id="type" defaultValue="1">
+         <select label="Type: " valueSet="type" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="stat" defaultValue="2" dataType="xsd:integer">
+         <select label="MMSHP Status: " valueSet="stat_list" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="Membership List En">
+      <template label="Membership List En" type="rtf" url="membershipListEn.rtf"/>
+      <template label="Membership List Ru" type="rtf" url="membershipListRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

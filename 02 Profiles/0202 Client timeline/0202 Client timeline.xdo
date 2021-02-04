@@ -1,0 +1,224 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0202 Client timeline</title>
+   <description>HRS TNG3 report 0202 Client timeline</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="4"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from
+
+(select
+  re.card_id cardid, --cardid
+  re.CLOCKIN time, --time
+  'check in' event,
+  '('||re.card_id||')'||c.last_name||' '||c.first_name||' checked in '||r.name||' granted by access rule '||fa.name dtls,
+  1 eventtype --checkin
+
+  from registration re, cards c, rvc r, FACILITY_ACCESS_DTL fad, FACILITY_ACCESS fa
+  where re.card_id=c.card_id
+    and re.rvc_id=r.rvc_id
+    and re.CLOCKIN is not null
+    and re.FACILITY_ACCESS_DTL_ID = fad.id(+)
+    and fad.FACILITY_ACCESS_ID = fa.FACILITY_ACCESS_ID(+)
+    and c.card_id in (:cid)
+
+union all
+
+  select
+  re.card_id cardid, --cardid
+  re.CLOCKOUT time, --time
+  'check out' event,
+  '('||re.card_id||')'||c.last_name||' '||c.first_name||' checked out from '||r.name dtls,
+  2 eventtype --checkout
+
+  from registration re, cards c, rvc r
+  where re.card_id=c.card_id
+    and re.rvc_id=r.rvc_id
+    and re.CLOCKOUT is not null
+    and re.card_id in (:cid)
+
+union all
+
+  select
+  d.DEF_CARD_ID cardid, --cardid
+  d.tm time, --time
+  'cashier check' event,
+  '('||d.DEF_CARD_ID||')'||c.last_name||' '||c.first_name||' identified by card type '||to_char(ct.type_name)||'-'||nvl(d.def_magstripe,'with no magstripe')||' recived check with number '||d.chknum||' at '||r.name||' with total '||d.ttl||' and details '||LISTAGG(to_char(dd.name||' priced '||(dd.ttl-dd.dsc+dd.pay_ttl_subscr)), ', ') WITHIN GROUP (ORDER BY dd.name) dtls,
+  3 eventtype --check
+  from docs d, cards c, rvc r, docs_dtl dd, card_types ct
+  where d.DEF_CARD_ID=c.card_id
+    and d.def_card_type_id=ct.card_type_id
+    and d.rvc=r.rvc_id
+    and d.cofirmation ='T'
+    and d.CHECK_OPEN='F'
+    and d.doc_id=dd.doc_id
+    and dd.void_flag is null
+    and card_id in (:cid)
+
+  group by
+  d.DEF_CARD_ID,
+  d.tm,
+  c.last_name,
+  c.first_name,
+  r.name,
+  d.ttl,
+  d.chknum,
+  to_char(ct.type_name),
+  d.def_magstripe
+
+union all
+
+  select
+  (select br.resource_id from booking_resources br where b.booking_id=br.booking_id and br.RESOURCE_TYPE='P') cardid,
+  b.time_start time,
+  'booking started' event,
+  (select LISTAGG(to_char(br.resource_name), ', ') WITHIN GROUP (ORDER BY br.resource_name) from booking_resources br where b.booking_id=br.booking_id and br.RESOURCE_TYPE='T')||' started treatment '||b.name||' at '||(select LISTAGG(to_char(br.resource_name), ', ') WITHIN GROUP (ORDER BY br.resource_name) from booking_resources br where b.booking_id=br.booking_id and br.RESOURCE_TYPE='F') dtls,
+  4 eventtype --booking start
+  from bookings b
+  where b.status not in ('V','M')
+    and (select br.resource_id from booking_resources br where b.booking_id=br.booking_id and br.RESOURCE_TYPE='P') in (:cid)
+
+union all
+
+  select
+  (select br.resource_id from booking_resources br where b.booking_id=br.booking_id and br.RESOURCE_TYPE='P') cardid,
+  b.TIME_END time,
+  'booking finished' event,
+  (select LISTAGG(to_char(br.resource_name), ', ') WITHIN GROUP (ORDER BY br.resource_name) from booking_resources br where b.booking_id=br.booking_id and br.RESOURCE_TYPE='T')||' finished treatment '||b.name||' at '||(select LISTAGG(to_char(br.resource_name), ', ') WITHIN GROUP (ORDER BY br.resource_name) from booking_resources br where b.booking_id=br.booking_id and br.RESOURCE_TYPE='F') dtls,
+  5 eventtype --booking finish
+  from bookings b
+  where b.status not in ('V','M')
+    and (select br.resource_id from booking_resources br where b.booking_id=br.booking_id and br.RESOURCE_TYPE='P') in (:cid)
+
+union all
+
+  select
+  t.card_id cardid,
+  t.REG_TM time,
+  'ticket registration start' event,
+  'Ticket '||'with code '||t.code||' was activated for ('||c.card_id||') '||c.LAST_NAME||' '||c.first_name dtls,
+  6 eventtype
+  from tickets t, cards c 
+  where t.card_id=c.card_id
+    and t.card_id in (:cid)
+
+union all
+
+  select
+  t.card_id cardid,
+  t.RELEASE_TM time,
+  'ticket registration end' event,
+  'Ticket '||'with code '||t.code||' was released for ('||c.card_id||') '||c.LAST_NAME||' '||c.first_name dtls,
+  7 eventtype
+  from tickets t, cards c 
+  where t.card_id=c.card_id
+    and t.RELEASE_TM is not null
+    and t.card_id in (:cid)
+  
+union all
+
+  select
+  d.DEF_CARD_ID,
+  d.tm,
+  'accounting balance correction' event,
+  ('Operator'||' '||d.OPERATOR||' performed manual correction for account '|| ad.NAME ||' with value '|| d.ttl ||' by check number '|| d.CHKNUM ||' for client ('|| d.DEF_CARD_ID||') '|| c.last_name||' '||c.first_name) dtls,
+  8 eventtype -- manual accounting agjustment
+  from docs d, accounting a, account_def ad, cards c
+  where d.doc_id=a.doc_id
+    and d.DEF_CARD_ID=c.CARD_ID
+    and a.account_def_id=ad.account_def_id
+    and d.doc_id not in (select doc_id from docs_paym)
+    and d.def_card_id in (:cid)
+    and d.cofirmation='T'
+    and d.CHECK_OPEN='F'
+
+
+  ) datast
+
+where trunc(datast.time) between trunc(:datar) and trunc(:daten)
+and datast.eventtype  in (:evetype)
+order by datast.time asc]]>
+         </sql>
+         <input id="cid" value="${cid}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="evetype" value="${evetype}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+nvl((select '('||card_id||') '||last_name||' '||first_name cl from cards where card_id=(:cid) ),'SELECT CORRECT CLIENT ID') clientparam
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="cid" value="${cid}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="evtype">
+         <sql>
+            <![CDATA[select 'Check in',1 from dual
+union all
+select 'Check out',2 from dual
+union all
+select 'Cashier check',3 from dual
+union all
+select 'Booking start',4 from dual
+union all
+select 'Booking end',5 from dual
+union all
+select 'Ticket start',6 from dual
+union all
+select 'Ticket end',7 from dual
+union all
+select 'Accounting adjustment',8 from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="cid">
+         <input label="Client ID: "/>
+      </parameter>
+      <parameter id="evetype" dataType="xsd:integer">
+         <select label="Event type: " valueSet="evtype" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="clientTimelineEn">
+      <template label="clientTimelineEn" type="rtf" url="clientTimelineEn.rtf"/>
+      <template label="clientTimelineRu" type="rtf" url="clientTimelineRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

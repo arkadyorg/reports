@@ -1,0 +1,192 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0401 Booking analysis</title>
+   <description>HRS TNG3 report 0401 Booking analysis</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    1 cou,
+    b.booking_id,
+    b.status,
+    b.name itemname,
+    b.TIME_START,
+    b.TIME_END,
+    b.mi_id,
+    b.doc_id,
+    b.BOOKING_EMPL_ID,
+    e.name2||' '||e.name1 emplname,
+    b.reference,
+    tres.tname,
+    fres.fname,
+    mi.si,
+    msi.name siname,
+    mi.fgrp,
+    mfgrp.NAME fgrpname,
+    voirs.REFERENCE voidref,
+    (case when (d.cofirmation='T' and d.check_open='F') then 'payed' 
+        when(d.cofirmation='F' and d.check_open='T') then 'check '||d.chknum || ' open' 
+        else 'unpayed' end ) paystatus
+
+from 
+    bookings b, 
+    employees e, 
+    docs d, 
+    menu_items mi, 
+    menu_si msi, 
+    menu_fgrp mfgrp,
+	(
+        select
+            br.BOOKING_ID,
+            LISTAGG(to_char(br.RESOURCE_NAME), '; ') WITHIN GROUP (ORDER BY br.RESOURCE_NAME) tname
+        from BOOKING_RESOURCES br
+        where br.RESOURCE_TYPE = 'T'
+        group by br.BOOKING_ID
+	)tres,
+	(
+        select
+            br.BOOKING_ID,
+            LISTAGG(to_char(br.RESOURCE_NAME), '; ') WITHIN GROUP (ORDER BY br.RESOURCE_NAME) fname
+        from BOOKING_RESOURCES br
+        where br.RESOURCE_TYPE = 'F'
+        group by br.BOOKING_ID
+	)fres,
+    (
+        select distinct
+            bh.BOOKING_ID,
+            bh.REFERENCE
+        from BOOKINGS_HISTORY bh,
+            (select 
+                ibh.booking_id,
+                max(ibh.time) maxtime
+            from 
+                BOOKINGS_HISTORY ibh
+            where 
+                ibh.NEW_STATUS = 'V'
+            and ibh.reference is not null
+            group by
+                ibh.booking_id)voir
+        where 
+            bh.time = voir.maxtime
+    )voirs
+
+where b.booking_id=tres.BOOKING_ID(+)
+    and b.booking_id=fres.BOOKING_ID(+)
+    and b.BOOKING_EMPL_ID = e.empl_id
+    and b.doc_id=d.doc_id(+)
+    and b.mi_id=mi.mi_id
+    and mi.si=msi.si_id
+    and mi.fgrp=mfgrp.fgrp_id
+    and b.BOOKING_ID = voirs.BOOKING_ID(+)
+    and (:empl_id is null or b.booking_empl_id=:empl_id)
+    and trunc(b.TIME_START) between trunc(:datar) and trunc(:daten)
+    and (:si_id is null or mi.si=:si_id)
+    and (:fgrp_id is null or mi.fgrp=:fgrp_id)
+    and b.status in (:bookingstatus)]]>
+         </sql>
+         <input id="empl_id" value="${empl_id}" dataType="xsd:integer"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="si_id" value="${si_id}" dataType="xsd:integer"/>
+         <input id="fgrp_id" value="${fgrp_id}" dataType="xsd:integer"/>
+         <input id="bookingstatus" value="${bookingstatus}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+nvl((select name from menu_si where si_id=(:si_id)),'All') siid,
+nvl((select name from menu_fgrp where fgrp_id=(:fgrp_id)),'All') fgrpid,
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:datar, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:daten, 'DD.MM.YYYY') as report_end
+from dual]]>
+         </sql>
+         <input id="si_id" value="${si_id}" dataType="xsd:integer"/>
+         <input id="fgrp_id" value="${fgrp_id}" dataType="xsd:integer"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="FGRPs">
+         <sql>
+            <![CDATA[select fgrp_id|| ' - '||name , fgrp_id  from menu_fgrp order by fgrp_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="GRPs">
+         <sql>
+            <![CDATA[select si_id|| ' - '|| name, si_id from menu_si order by si_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="bEMPLs">
+         <sql>
+            <![CDATA[select 
+distinct e.name2 || ' ' || e.name1 as employee, e.empl_id as empl_id
+from employees e
+order by e.name2 || ' ' || e.name1]]>
+         </sql>
+      </valueSet>
+      <valueSet id="bookingstatus">
+         <sql>
+            <![CDATA[select 'Booked','C' from dual
+union all
+select 'Confirmed','R' from dual
+union all
+select 'In progress','O' from dual
+union all
+select 'Done','P' from dual
+union all
+select 'Cancelled','V' from dual
+union all
+select 'Missed','M' from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="si_id" dataType="xsd:integer">
+         <select label="Sales group: " valueSet="GRPs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="fgrp_id" dataType="xsd:integer">
+         <select label="Family group: " valueSet="FGRPs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="empl_id" dataType="xsd:integer">
+         <select label="Booking employee: " valueSet="bEMPLs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="bookingstatus">
+         <select label="Booking status: " valueSet="bookingstatus" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="bookingAnalysisEn">
+      <template label="bookingAnalysisEn" type="rtf" url="bookingAnalysisEn.rtf"/>
+      <template label="bookingAnalysisRu" type="rtf" url="bookingAnalysisRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

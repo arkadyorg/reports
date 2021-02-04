@@ -1,0 +1,110 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0205 Registrations</title>
+   <description>HRS TNG3 report 0205 Registrations</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[SELECT 
+    card_types.type_name as ctname,
+	cards.last_name||' '||cards.first_name||' '||cards.second_name as GuestName,
+	registration.BUSSINES_DATE as BRegDate,
+	TO_CHAR(registration.BUSSINES_DATE, 'DD.MM.YYYY') as RegDate, 
+	cards.card_id,
+	cards.MAGSTRIPE,
+	(case when registration_keys.key_number is null then registration_keys.key_code else  registration_keys.key_number end) as key_code,
+	--registration_keys.key_code,
+	registration_keys.key_number,
+	TO_CHAR(registration.clockin, 'DD.MM.YYYY HH24:MI') as  RClockIn, 
+	TO_CHAR(registration.clockout , 'DD.MM.YYYY HH24:MI') as RClockOut,
+	(case when registration_keys.reg_id is null then 'without key' else 'with key' end) flgKey
+
+FROM cards, registration, registration_keys, card_types
+
+WHERE cards.card_id = registration.card_id
+	and registration.reg_id=registration_keys.reg_id(+)
+    and cards.card_type_id = card_types.card_type_id
+    and cards.card_type_id in (:ctype)
+	and LOWER(cards.last_name||' '||cards.first_name||' '||cards.second_name||'('||cards.card_id||')') like LOWER(nvl('%'||:InGuesName||'%', cards.last_name||' '||cards.first_name||' '||cards.second_name||'('||cards.card_id||')'))
+	and cards.card_id = nvl(:InIdCard,cards.card_id )
+	and (:rvcid is null or registration.RVC_ID in (select rvc_id from rvc where rvc_id=:rvcid))
+	and registration.BUSSINES_DATE between trunc(:dStart) and trunc(:dEnd)]]>
+         </sql>
+         <input id="ctype" value="${ctype}" dataType="xsd:string"/>
+         <input id="InGuesName" value="${InGuesName}" dataType="xsd:string"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:string"/>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="ParamSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:dStart, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:dEnd, 'DD.MM.YYYY') as report_end,
+nvl((select name from rvc where rvc_id = (:rvcid)),'All') rvc
+from dual]]>
+         </sql>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <ParamSet>
+                  <nodeList dataSet="ParamSet" select="/ROWSET/PARAMSET_ROW"/>
+               </ParamSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="ctype">
+         <sql>
+            <![CDATA[select type_name, CARD_TYPE_ID from card_types order by type_name]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="dStart" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="dEnd" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="InGuesName">
+         <input label="Guest name: "/>
+      </parameter>
+      <parameter id="rvcid" defaultValue="SPA">
+         <select label="RVC: " valueSet="rvc" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="ctype">
+         <select label="Card Type:" valueSet="ctype" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="RegistrationsEn">
+      <template label="RegistrationsRu" type="rtf" url="registrationsRu.rtf"/>
+      <template label="RegistrationsEn" type="rtf" url="registrationsEn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

@@ -1,0 +1,223 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0903 Vouchers with balances</title>
+   <description>HRS TNG3 report 0903 Vouchers with balances</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select a.* from
+        (select 
+            --	nvl((select va.VALUE	from VOUCHER_ACCOUNTING va	where va.VOUCHER_ACCOUNTING_ID in (select	min(va.VOUCHER_ACCOUNTING_ID) from voucher_accounting va , docs d where  va.doc_id=d.doc_id  and d.cofirmation ='T'and d.CHECK_OPEN = 'F' 	group by va.VOUCHER_ID)	and v.voucher_id=va.voucher_id),0) sellval,
+            nvl(vs.value,0) sellval,
+            nvl((select	
+                    c.first_name||' '||c.last_name	
+                from 
+                    VOUCHER_ACCOUNTING va,
+                    docs d, 
+                    cards c	
+                where 
+                    va.doc_id=d.doc_id 
+                    and d.DEF_CARD_ID=c.card_id 
+                    and d.cofirmation ='T'
+                    and d.CHECK_OPEN = 'F' 
+                    and va.VOUCHER_ACCOUNTING_ID in (select 
+                                                        min(va.VOUCHER_ACCOUNTING_ID)	
+                                                    from voucher_accounting va	
+                                                    group by va.VOUCHER_ID) 
+                    and v.voucher_id=va.voucher_id),'-') guest,
+
+            nvl((select 
+                    sum(va.VALUE)
+                from 
+                    VOUCHER_ACCOUNTING va, 
+                    docs d	
+                where va.doc_id=d.doc_id 
+                    and d.cofirmation ='T'
+                    and d.CHECK_OPEN = 'F'
+                    and va.VOUCHER_ID=v.voucher_id 
+                    and trunc(d.tm) <trunc(:date_from)),0) incombal,
+
+            nvl((select 
+                    sum(va.VALUE)
+                from 
+                    VOUCHER_ACCOUNTING va, 
+                    docs d	
+                where va.doc_id=d.doc_id 
+                    and va.VOUCHER_ID=v.voucher_id 
+                    and d.cofirmation ='T'
+                    and d.CHECK_OPEN = 'F'
+                    and trunc(d.tm) between trunc(:date_from) 
+                    and trunc(:date_to) 
+                    and va.value < 0),0) redemptions,
+
+            nvl((select sum(va.VALUE)
+                from 
+                    VOUCHER_ACCOUNTING va, 
+                    docs d	
+                where va.doc_id=d.doc_id 
+                    and va.VOUCHER_ID=v.voucher_id 
+                    and d.cofirmation ='T'
+                    and d.CHECK_OPEN = 'F'
+                    and trunc(d.tm) between trunc(:date_from) and trunc(:date_to) 
+                    and va.value > 0),0) topups,
+
+            nvl((select 
+                    sum(va.VALUE)	
+                from 
+                    VOUCHER_ACCOUNTING va, 
+                    docs d	
+                where va.doc_id=d.doc_id 
+                    and va.VOUCHER_ID=v.voucher_id 
+                    and d.cofirmation ='T'
+                    and d.CHECK_OPEN = 'F'
+                    and trunc(d.tm) between trunc(:date_from) and trunc(:date_to)),0) movebal,
+
+            nvl((select 
+                    sum(va.dsc)	
+                from 
+                    VOUCHER_ACCOUNTING va, 
+                    docs d	
+                where va.doc_id=d.doc_id 
+                    and va.VOUCHER_ID=v.voucher_id 
+                    and d.cofirmation ='T'
+                    and d.CHECK_OPEN = 'F'
+                    and trunc(d.tm) between trunc(:date_from) and trunc(:date_to)),0) movdsc,
+
+            nvl((select 
+                    sum(va.VALUE)	
+                from 
+                    VOUCHER_ACCOUNTING va, 
+                    docs d	
+                where va.doc_id=d.doc_id 
+                and va.VOUCHER_ID=v.voucher_id 
+                and d.cofirmation ='T'
+                and d.CHECK_OPEN = 'F'
+                and trunc(d.tm) <=trunc(:date_to)),0) outcombal,
+            --v.voucher_id,
+            v.CODE, 
+            v.created_person,
+            v.use_count,
+            to_char(v.created_tm,'DD.MM.YY') created_tm,
+            to_char(v.valid_from,'DD.MM.YY') valid_from,
+            to_char(v.valid_till,'DD.MM.YY') valid_till,
+            nvl(v.value_balance,0) value_balance,
+            :ur||'&datar='||to_char(:date_from,'DD.MM.YYYY')||'&daten='||to_char(:date_to,'DD.MM.YYYY')||'&code='||v.CODE||'&report_type=0&RVCcode=*&_xt=Client%20account%20detailed&_xf=html&_xmode=0' ht,
+            vc.name 
+        from 
+            voucher v, 
+            voucher_campaign vc ,
+            (select 
+                va.VALUE ,
+                va.voucher_id	
+            from VOUCHER_ACCOUNTING va	
+            where va.VOUCHER_ACCOUNTING_ID in (select
+                                                    min(va1.VOUCHER_ACCOUNTING_ID) 
+                                                    from 
+                                                        voucher_accounting va1 , 
+                                                        docs d1 
+                                                    where  va1.doc_id=d1.doc_id  
+                                                        and d1.cofirmation ='T'
+                                                        and d1.CHECK_OPEN = 'F' 
+                                                    group by va1.VOUCHER_ID)) vs
+
+        where 
+            vc.voucher_campaign_id = v.voucher_campaign_id 
+            and v.voucher_id=vs.voucher_id(+)
+            and vc.voucher_campaign_id=nvl(:vtype,vc.voucher_campaign_id) 
+            and (:exp=1 and (v.valid_till>trunc(:date_from) or v.valid_till is null) or :exp=0)
+            and v.CODE= nvl(:code,v.CODE)) a
+where 
+    ((:noused=1 and a.use_count<>0) or :noused=0)]]>
+         </sql>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+         <input id="ur" value="${ur}" dataType="xsd:string"/>
+         <input id="vtype" value="${vtype}" dataType="xsd:integer"/>
+         <input id="exp" value="${exp}" dataType="xsd:integer"/>
+         <input id="code" value="${code}" dataType="xsd:string"/>
+         <input id="noused" value="${noused}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="ParamSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:date_from, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:date_to, 'DD.MM.YYYY') as report_end,
+(case when (:exp) = 0 then 'No' else 'Yes' end) exp,
+(case when (:noused) = 0 then 'No' else 'Yes' end) noused,
+nvl((select name from voucher_campaign where voucher_campaign_id = (:vtype)),'All') vtype,
+(:code) pcode
+
+from dual]]>
+         </sql>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+         <input id="exp" value="${exp}" dataType="xsd:integer"/>
+         <input id="noused" value="${noused}" dataType="xsd:integer"/>
+         <input id="vtype" value="${vtype}" dataType="xsd:integer"/>
+         <input id="code" value="${code}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <ParamSet>
+                  <nodeList dataSet="ParamSet" select="/ROWSET/PARAMSET_ROW"/>
+               </ParamSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="vtype_list">
+         <sql>
+            <![CDATA[select name , voucher_campaign_id from voucher_campaign]]>
+         </sql>
+      </valueSet>
+      <valueSet id="YN">
+         <sql>
+            <![CDATA[select 'N',0 from dual
+union all
+select 'Y',1 from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="vtype" dataType="xsd:integer">
+         <select label="Voucher Type: " valueSet="vtype_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="date_from" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="date_to" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="code">
+         <input label="Voucher code: "/>
+      </parameter>
+      <parameter id="exp" dataType="xsd:integer">
+         <select label="Hide Expired: " valueSet="YN" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="noused" dataType="xsd:integer">
+         <select label="Hide Not Used: " valueSet="YN" multiple="false" all="false" allValue="null"/>
+      </parameter>
+      <parameter id="ur" defaultValue="/xmlpserver/Reports/09 Vouchers/0901 Voucher operations detalization/0901 Voucher operations detalization.xdo?_xpf=&amp;_xpt=0&amp;_xdo=%2FReports%2F09%20Vouchers%2F0901%20Voucher%20operations%20detalization%2F0901%20Voucher%20operations%20detalization.xdo"/>
+   </parameters>
+   <templates default="voucherEn">
+      <template label="voucherEn" type="rtf" url="vouchersWithBalancesEn.rtf"/>
+      <template label="voucherRu" type="rtf" url="vouchersWithBalancesRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

@@ -1,0 +1,180 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0501 Cashier report</title>
+   <description>HRS TNG3 report 0501 Cashier report (TNG 3.2.5+)</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    dp.doc_id,
+    dp.paym_seq,
+    dp.tm_id,
+    dp.tm_name,
+    dp.amount,
+    dp.cashier_id,
+    dp.employee_id,
+    (e.name2||' '||e.name1) payment_employee,
+    dp.CASHIER_SHIFT_ID,
+    dp.CURRENCY_AMOUNT,
+    dp.reference payment_reference,
+    d.bussines_date,
+    d.tm,
+    d.rvc,
+    d.chknum,
+    d.gst,
+    nvl((e.name2||' '||e.name1),'unknown operator') operator,
+    '('||d.def_card_id||') '||c.last_name||' '||c.first_name||' '||c.second_name fio,
+    r.name rvcname,
+    1 numbers,
+    DECODE(dp.workstation, '127.0.0.1', 'server', /*CONFIGURE ME: workstation decode to client defined name*/
+                            '192.168.1.22', 'SPA',
+                            '192.168.1.215', 'SPA BAR',
+                            'new workstation') workstation
+
+from docs_paym dp, docs d, rvc r, cards c, employees e
+
+where dp.void_flag is null
+    and dp.doc_id=d.doc_id
+    and d.rvc=r.rvc_id
+    and d.def_card_id=c.card_id(+)
+    and dp.employee_id = e.empl_id(+)
+    and d.cofirmation='T'
+    and d.check_open='F'
+    
+    and (nvl((e.name2||' '||e.name1),'unknown operator') in (:emp))
+    and trunc(d.TM) between trunc(:datar) and trunc(:daten)
+    and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+    and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+    and r.site_id in (:site_list)]]>
+         </sql>
+         <input id="emp" value="${emp}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+--(select listagg(to_char(name2||' '||name1), ',') within group (order by name2||' '||name1)  from employees where name2||' '||name1 in (:emp)) hemplist,
+nvl((select name from rvc_group where rvc_group_id = (:rvcgroup)),'All') rgroup,
+nvl((select name from rvc where rvc_id = (:rvcid)),'All') rvc
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="emp" value="${emp}" dataType="xsd:string"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="employees">
+         <sql>
+            <![CDATA[select
+    operator
+from
+    (select distinct 
+        operator,
+        'T' optype
+    from docs
+    where operator is not null and operator in (select name2||' '||name1 from employees)
+
+    union all
+
+    select distinct 
+        operator,
+        'E' optype
+    from docs
+    where operator is not null and operator not in (select name2||' '||name1 from employees)
+
+    union all
+
+    select
+        'unknown operator' operator,
+        'U' optype
+    from dual)
+order by operator asc]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name, rvc_group_id as rvrcgroup from rvc_group
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvcid">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="emp">
+         <select label="Employee: " valueSet="employees" multiple="true" all="true" allValue="lov" refreshParameters="false"/>
+      </parameter>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvcgroup" dataType="xsd:integer">
+         <select label="RVC group: " valueSet="rvc" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="rvcid" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvcid" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="cashierEN">
+      <template label="cashierEN" type="rtf" url="casherReportEn.rtf"/>
+      <template label="cashier short EN" type="rtf" url="cashierShortEn.rtf"/>
+      <template label="cashierRU" type="rtf" url="cashierReportRu.rtf"/>
+      <template label="cashier short RU" type="rtf" url="cashierShortRu.rtf"/>
+      <template label="casherReportByWorkstationEn" type="rtf" url="casherReportByWorkstationEn.rtf"/>
+      <template label="casherReportByWorkstationRu" type="rtf" url="casherReportByWorkstationRu.rtf"/>
+      <template label="casherReportByOperatorEn" type="rtf" url="casherReportByOperatorEn.rtf"/>
+      <template label="casherReportByOperatorRu" type="rtf" url="casherReportByOperatorRu.rtf"/>
+   </templates>
+   <burst enabled="false">
+      <property name="BURSTING_NODE" value="/DATA"/>
+      <property name="DELIVERY_KEY" value="/DATA"/>
+   </burst>
+</report>

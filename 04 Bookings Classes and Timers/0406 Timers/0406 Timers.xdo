@@ -1,0 +1,101 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0406 Timers</title>
+   <description>HRS TNG3 report 0406 Timers</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    c.card_id||' '||c.last_name||' '||c.first_name cname,
+    t.RVC_ID,
+    r.NAME rvc_name,
+    trunc(t.tm_start) datestart,
+    t.tm_start,
+    t.tm_stop,
+    t.ACT_COUNT,
+    t.REFERENCE,
+    t.TM_DUE_BACK,
+    mi.name1 item_name,
+    (case when
+    t.tm_stop is null then 0
+    else 1 end) return_flag,
+    t.START_EMPL_ID,
+    estart.name1||' '||estart.name2 start_employee,
+    t.STOP_EMPL_ID,
+    estop.name1||' '||estop.name2 stop_employee
+
+from timer t, cards c, rvc r, menu_items mi, employees estart, employees estop
+
+where t.card_id=c.card_id
+    and t.rvc_id=r.RVC_ID
+    and t.mi_id = mi.mi_id
+    and t.START_EMPL_ID = estart.EMPL_ID(+)
+    and t.STOP_EMPL_ID = estop.EMPL_ID(+)
+    and trunc(t.tm_start) between trunc(:datar) and (:daten)
+    and (case when t.tm_stop is null then 0 else 1 end) in (:item_status)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="item_status" value="${item_status}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="timer_status">
+         <sql>
+            <![CDATA[select 'Returned',1 from dual
+union all
+select 'Not returned',0 from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="item_status">
+         <select label="Item status: " valueSet="timer_status" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="timersEn">
+      <template label="timersEn" type="rtf" url="timersEn.rtf"/>
+      <template label="timersRu" type="rtf" url="timersRu.rtf"/>
+      <template label="Timers by date EN" type="rtf" url="timersByDateEn.rtf" outputFormat="html,pdf,rtf,excel,excel2000,csv"/>
+      <template label="Timers by date Ru" type="rtf" url="timersByDateRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

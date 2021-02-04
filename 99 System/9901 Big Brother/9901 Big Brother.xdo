@@ -1,0 +1,298 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>9901 Big Brother</title>
+   <description>HRS TNG3 report 9901 Big Brother</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="4"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+bbdata.empl_id ,
+bbdata.operator,
+bbdata.CLEAROPERATOR ,
+bbdata.time ,
+bbdata.event ,
+bbdata.dtls ,
+bbdata.eventtype 
+--,bbdata.SERVICE -- Service information
+from
+(
+select
+	0 empl_id,
+	to_char(nvl(al.OPERATOR,'UNDEFINED')) operator,
+	to_char(nvl(UPPER(REGEXP_REPLACE (al.OPERATOR, '\W|\d', '')),'UNDEFINED')) CLEAROPERATOR,
+	al.TM time,
+	decode(al.EVENT_TYPE, 'N', 'New entry',
+							'U', 'Update entry',
+							'D', 'Delete entry',
+							al.EVENT_TYPE
+							) event,
+	decode (al.TBL,'ACCOUNT_DEF','Accounts configuration',
+					'ACTIVITY_SKILLS','Skill resource edit',
+					'ACTIVITY_SKILLS_ASSIGN','Change skill assignment',
+					'BONUS_TRIGGERS','Change bonus triggers',
+					'BOOKING_RESOURCES','Changes in booking resources',
+					'CARDS','Changes in client cards',
+					'CARD_FOREIGN_IDS','Changes in cards foreign IDs',
+					'CARD_STATUS','Client card status change',
+					'CARD_TYPES','Card types configuration',
+					'CARD_TYPES_ACCOUNTS','Changes in card types accounts',
+					'CARD_TYPES_RULESET_LINK','Changes in Card type <-> rulsets link',
+					'CARD_XTRA','Changes in clients extra cards',
+					'CLIENT_PROFILE_DATA','Changes in client profile data',
+					'CLIENT_PROFILE_SPEC','Changes in client profile specs',
+					'CLIENT_REQUEST','Changes in client request',
+					'DICTIONARY_HIERARCHY','Changes in item folders herarchy',
+					'EMPLOYEES','Changes in employees',
+					'FACILITIES','Changes in facilities configuration',
+					'FACILITY_ACCESS','Changes in faility access rules',
+					'FACILITY_ACCESS_DTL','Changes in facility rules dtls',
+					'INTERFACES','Changes in interfaces',
+					'INV_STORE','Changes in store data',
+					'MENU_FGRP','Changes in menu family groups',
+					'MENU_ITEMS','Changes in menu items',
+					'MENU_ITEM_SKILLS','Changes in menu item skills',
+					'MENU_PRICE','Changes in menu prices',
+					'MENU_SI','Changes in menu groups',
+					'REASON_TEXT','Changes in reason texts',
+					'RESMAN_PRESET','Changes in schedule templates',
+					'RESMAN_PRESET_DTL','Changes in schedule template details',
+					'RESOURCE_SCHEDULE','Changes in resources schedule',
+					'RULESETS','Changes in rulesets',
+					'RULESETS_DTL','Changes in rulesets dtls',
+					'RVC','Changes in RVC configuration',
+					'RVC_GROUP','Changes in RVC groups',
+					'RVC_GROUP_LINK','Changes in RVCs link to groups',
+					'STRINGS','Changes in menu item strings',
+					'SUBSCRIPTION_ITEMS','Changes in subscription items',
+					'TEMPLATES','Changes in templates',
+					'TENDERMEDIA','Changes in payment methods configuration',
+					'TIMER','Changes in timers',
+					'TIME_PROFILES','Changes in time profiles',
+					'TIME_PROFILE_DTLS','Changes in time profile dts',
+					'USERS_ROLES','Changes in user roles',
+			'Changes in '||al.TBL)||' edited field '||ald.FLD||' old value: '||nvl(ald.OLD_VALUE,'empty field ')||' '||ald.OLD_REFERENCE||' '||'was updated by following value: '||nvl(ald.NEW_VALUE,'empty field')||' '||ald.NEW_REFERENCE dtls,
+	1 eventtype, --auditlog event
+	'Select * from '||al.TBL||' where '||keyval.column_name||' = '||al.KEY_VALUE SERVICE --uncomment to get direct pointer to edited object
+from audit_log_dtl ald, AUDIT_LOG al,
+	(SELECT cols.table_name, cols.column_name, cols.position, cons.status, cons.owner
+	FROM all_constraints cons, all_cons_columns cols
+	WHERE cons.constraint_type = 'P'
+	AND cons.constraint_name = cols.constraint_name
+	AND cons.owner = cols.owner
+	and cons.owner = 'CLUB' --param
+	ORDER BY cols.table_name, cols.position)keyval
+where 
+	ald.LOG_ID=al.id
+	and al.tbl=keyval.table_name
+
+union all
+
+select
+	cmh.EMPL_ID,
+	to_char(nvl(cmh.OPERATOR,'UNDEFINED')) operator,
+	to_char(nvl(UPPER(REGEXP_REPLACE (cmh.OPERATOR, '\W|\d', '')),'UNDEFINED')) CLEAROPERATOR,
+	cmh.tm time,
+	'Cards merge' event,
+	to_char('Operator'||' '||e.name2||' '||e.name1||' merged card ('||cmh.SOURCE_CARD_ID||') '||cmh.SOURCE_NAME||' with ('||cmh.TARGET_CARD_ID||') '||cmh.TARGET_NAME) dtls,
+	2 eventtype, --Cards merge event
+	'Select * from cards_merge_history'||' where CARDS_MERGE_HISTORY_ID'||' = '||cmh.CARDS_MERGE_HISTORY_ID SERVICE --uncomment to get direct pointer to edited object
+from CARDS_MERGE_HISTORY cmh, employees e
+where cmh.empl_id=e.empl_id(+)
+
+union all
+
+select
+	lh.EMPL_ID,
+	to_char(nvl(e.name2||' '||e.name1,'UNDEFINED')) operator,
+	to_char(nvl(UPPER(REGEXP_REPLACE (e.name2||' '||e.name1, '\W|\d', '')),'UNDEFINED')) CLEAROPERATOR,
+	lh.tm time,
+	decode(lh.event,'IN','Employee log in',
+	'OU','Employee log out',
+	lh.event) event,
+	to_char('Operator'||' '||e.name2||' '||e.name1||' logged '||lh.event||' on station '||lh.workstation) dtls,
+	3 eventtype, --operator login/logout TNG
+	'Select * from login_history'||' where LOGIN_HISTORY.ID'||' = '||lh.id service--uncomment to get direct pointer to edited object
+from LOGIN_HISTORY lh, employees e
+where lh.empl_id=e.empl_id(+)
+  
+union all
+
+select
+	dd.POSTING_EMPL_ID empl_id,
+	to_char(nvl(pe.name2||' '||pe.name1,'UNDEFINED')) operator,
+	to_char(nvl(UPPER(REGEXP_REPLACE (pe.name2||' '||pe.name1, '\W|\d', '')),'UNDEFINED')) CLEAROPERATOR,
+	dd.tm time,
+	'add item to check' event,
+	to_char('Operator'||' '||pe.name2||' '||pe.name1||' added item '||dd.name||' to check from from station '||dd.workstation) dtls,
+	4 eventtype, --add items to check
+	'Select * from docs_dtl where doc_id = '||dd.doc_id SERVICE --uncomment to get direct pointer to edited object
+from docs_dtl dd, employees pe
+where
+dd.POSTING_EMPL_ID = pe.empl_id
+
+union all
+
+select
+	0 empl_id,
+	to_char(nvl(d.operator,'UNDEFINED')) operator,
+	to_char(nvl(UPPER(REGEXP_REPLACE (d.operator, '\W|\d', '')),'UNDEFINED')) CLEAROPERATOR,
+	d.tm time,
+	'open check' event,
+	to_char('Operator'||' '||d.operator||' opened check number #'||d.chknum||' from station '||d.workstation||' at RVC '||r.name) dtls,
+	5 eventtype, --open check
+	'Select * from docs where doc_id = '||d.doc_id SERVICE --uncomment to get direct pointer to edited object
+from docs d, rvc r
+where d.rvc=r.RVC_ID
+
+union all
+
+select
+	bh.operator_empl_id empl_id,
+	to_char(nvl(e.name2||''||e.name1,'UNDEFINED')) operator,
+	to_char(nvl(UPPER(REGEXP_REPLACE (e.name2||''||e.name1, '\W|\d', '')),'UNDEFINED')) CLEAROPERATOR,
+	bh.time time,
+	'booking edit' event,
+	to_char('Operator'||' '||e.name2||' '||e.name1||' edited booking #'||bh.booking_id||' with details '||bh.details) dtls,
+	6 eventtype, --booking edit
+	'Select * from bookings_history where booking_id = '||bh.booking_id SERVICE --uncomment to get direct pointer to edited object
+from BOOKINGS_HISTORY bh, employees e
+where bh.OPERATOR_EMPL_ID=e.EMPL_ID
+
+union all
+
+select
+	0 empl_id,
+	to_char(nvl(d.operator,'UNDEFINED')) operator,
+	to_char(nvl(UPPER(REGEXP_REPLACE (d.operator, '\W|\d', '')),'UNDEFINED')) CLEAROPERATOR,
+	d.tm time,
+	'accounting balance correction' event,
+	to_char('Operator'||' '||d.OPERATOR||' performed manual correction for account '|| ad.NAME ||' with value '|| d.ttl ||' by check number '|| d.CHKNUM ||' for client ('|| d.DEF_CARD_ID||') '|| c.last_name||' '||c.first_name) dtls,
+	7 eventtype, -- manual accounting agjustment
+	'Select * from docs d, accounting a where d.doc_id=a.doc_id and d.doc_id='||d.doc_id SERVICE --uncomment to get direct pointer to edited object
+from docs d, accounting a, account_def ad, cards c
+where d.doc_id=a.doc_id
+	and d.DEF_CARD_ID=c.CARD_ID
+	and d.doc_id not in (select doc_id from docs_paym)
+	and a.account_def_id=ad.account_def_id
+	and d.cofirmation='T'
+	and d.CHECK_OPEN='F'
+) bbdata
+where trunc(bbdata.time) between trunc(:datar) and trunc(:daten)
+and bbdata.eventtype in (:evetype)
+and (
+
+bbdata.CLEAROPERATOR in (
+						select
+							to_char(nvl(UPPER(REGEXP_REPLACE (e.name2||''||e.name1, '\W|\d', '')),'UNDEFINED')) clearoperator
+						from employees e
+						where e.empl_id in (:emplst)
+                        )
+or bbdata.empl_id in (:emplst)
+
+)
+
+/*
+and (bbdata.empl_id in (:emplst) or
+
+bbdata.CLEAROPERATOR in (
+						select
+							to_char(nvl(UPPER(REGEXP_REPLACE (e.name2||''||e.name1, '\W|\d', '')),'UNDEFINED')) clearoperator
+						from employees e
+						where e.empl_id in (:emplst)
+                        )
+	)
+*/
+order by bbdata.time asc]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="evetype" value="${evetype}" dataType="xsd:integer"/>
+         <input id="emplst" value="${emplst}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="evtype">
+         <sql>
+            <![CDATA[select 'Audit log',1 from dual
+union all
+select 'Cards merge',2 from dual
+union all
+select 'Operator log in/out',3 from dual
+union all
+select 'Add items to check',4 from dual
+union all
+select 'Open check',5 from dual
+union all
+select 'Booking edit',6 from dual
+union all
+select 'Manual accountting adjustment',7 from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="emplist">
+         <sql>
+            <![CDATA[select
+to_char(e.name2||' '||e.name1) empl,
+empl_id
+from employees e
+
+union all
+
+select
+to_char('UNDEFINED') empl,
+0 empl_id
+from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="evetype" dataType="xsd:integer">
+         <select label="Event type: " valueSet="evtype" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="emplst">
+         <select label="Employee: " valueSet="emplist" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="bigBrotherEn">
+      <template label="bigBrotherEn" type="rtf" url="bigBrotherEn.rtf"/>
+      <template label="bigBrotherRu" type="rtf" url="bigBrotherRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

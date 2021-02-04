@@ -1,0 +1,237 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0602 Commissions</title>
+   <description>HRS TNG3 report 0602 Commissions</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="4"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="data">
+         <sql fixedSchema="false">
+            <![CDATA[WITH
+  plans AS
+(
+  select 
+    e.empl_id,
+    sum(dd.count) as MONTH_cnt_raw,
+    sum((dd.ttl - dd.dsc + dd.pay_ttl_subscr - dd.tax_addon) / case when br.resource_id is null then 1 else (select count(*) from booking_resources br where booking_id = dd.booking_id and resource_type = 'T') end) as MONTH_ttl_raw,
+    sum(dd.count * nvl(scom.plan_factor_prcnt,100) / 100) as MONTH_cnt,
+    sum((dd.ttl - dd.dsc + dd.pay_ttl_subscr - dd.tax_addon) / case when br.resource_id is null then 1 else (select count(*) from booking_resources br where booking_id = dd.booking_id and resource_type = 'T') end * nvl(scom.plan_factor_prcnt,100) / 100) as MONTH_ttl
+    
+  from
+    docs_dtl dd,
+    booking_resources br,
+    docs d,
+    menu_items mi,
+    salary_commission scom,
+    employees e
+  where
+    dd.doc_id = d.doc_id
+    and dd.booking_id = br.booking_id(+)
+    and (br.resource_type = 'T' or br.resource_type is null)
+    and mi.code = dd.mi_id
+    and e.empl_id = nvl(br.resource_id, dd.comission_empl_id)
+    and scom.commission_grp_id = mi.commission_grp_id
+    and scom.salary_class_id = e.salary_class_id(+)
+    and scom.salary_class_id = (:salary_class_id)--
+    and d.cofirmation = 'T'
+    and trunc(dd.tm) between trunc(:datar) and trunc(:daten)
+  group by
+    e.empl_id
+  
+),
+
+book_rev AS (
+  select 
+      b1.booking_empl_id as empl_id, 
+      count(*) as MONTH_cnt_raw,
+      sum((dd1.ttl - dd1.dsc)) as MONTH_ttl_raw,
+      count(*) as MONTH_cnt,
+      sum((dd1.ttl - dd1.dsc)) as MONTH_ttl
+    from bookings b1, docs_dtl dd1 
+      where b1.booking_id = dd1.booking_id  
+      and trunc(dd1.tm) between trunc(:datar) and trunc(:daten)
+  group by b1.booking_empl_id
+
+),
+  
+-- Produvt sales and treatment performance  
+  sales AS
+(
+  select 
+    dd.doc_id,
+    dd.tm,
+    to_char(dd.tm, 'dd.mm.yyyy hh24:mi') as tm_t,
+    c.card_id,
+    c.last_name || ' ' || c.first_name as client_name,
+    dd.count,
+    dd.mi_id,
+    dd.name,
+    (case when dd.pay_ttl_subscr !=0 then 0 else dd.ttl - dd.dsc - dd.tax_addon end) / case when br.resource_id is null then 1 else (select count(*) from booking_resources br where booking_id = dd.booking_id and resource_type = 'T') end as ttl,    
+    (dd.ttl - dd.dsc) / case when br.resource_id is null then 1 else (select count(*) from booking_resources br where booking_id = dd.booking_id and resource_type = 'T') end as ttl_nodsc,
+    nvl(br.resource_id, dd.comission_empl_id) as empl_id,
+    case when br.resource_id is null then 1 else (select count(*) from booking_resources br where booking_id = dd.booking_id and resource_type = 'T') end shar
+  from
+    docs_dtl dd,
+    booking_resources br,
+    docs d,
+    cards c
+  where
+    dd.doc_id = d.doc_id
+    and d.def_card_id = c.card_id
+    and dd.booking_id = br.booking_id(+)
+    and (br.resource_type = 'T' or br.resource_type is null)
+    and d.cofirmation = 'T'
+    and trunc(dd.tm) between trunc(:datar) and trunc(:daten)
+    and dd.void_flag is null
+),
+
+books AS
+(
+  select 
+    dd.doc_id,
+    dd.tm,
+    to_char(dd.tm, 'dd.mm.yyyy hh24:mi') as tm_t,
+    c.card_id,
+    c.last_name || ' ' || c.first_name as client_name,
+    dd.count,
+    dd.mi_id,
+    dd.name,
+    dd.ttl - dd.dsc - dd.tax_addon as ttl,    
+    dd.ttl - dd.dsc as ttl_nodsc,
+    b.booking_empl_id as empl_id,
+    1 shar
+  from
+    docs_dtl dd,
+    bookings b,
+    docs d,
+    cards c
+  where
+    dd.doc_id = d.doc_id
+    and d.def_card_id = c.card_id
+    and dd.booking_id = b.booking_id
+    and d.cofirmation = 'T'
+    and trunc(dd.tm) between trunc(:datar) and trunc(:daten)
+    and dd.void_flag is null
+)
+
+
+
+--  SALES
+select 
+  sales.*, plans.*,
+  e.name2 || ' ' || e.name1 as empl_name,
+  sales.ttl * scalc.prcnt / 100  + scalc.amnt * sales.count  as comission,
+  e.external
+from
+  menu_items mi,
+  employees e,
+  salary_calc scalc,
+  sales,
+  plans
+where
+  plans.empl_id=sales.empl_id
+  and mi.code = sales.mi_id
+  and e.empl_id = sales.empl_id
+  and scalc.commission_grp_id = mi.commission_grp_id
+  and scalc.salary_class_id = e.salary_class_id
+  and scalc.salary_class_id = (:salary_class_id)
+  and (scalc.charge_type not in ('B'))
+  and (scalc.tagret_amnt_max is null or scalc.tagret_amnt_max = 0 or scalc.tagret_amnt_max >= round(plans.month_ttl))
+  and (scalc.tagret_amnt_min is null or scalc.tagret_amnt_min = 0 or scalc.tagret_amnt_min <= round(plans.month_ttl))
+  and (scalc.tagret_cnt_max is null or scalc.tagret_cnt_max = 0 or scalc.tagret_cnt_max >= round(plans.month_cnt))
+  and (scalc.tagret_cnt_min is null or scalc.tagret_cnt_min = 0 or scalc.tagret_cnt_min <= round(plans.month_cnt))
+
+union all
+
+--  BOOKINGS
+
+select 
+  books.*, book_rev.*,
+  e.name2 || ' ' || e.name1 as empl_name,
+  books.ttl * scalc.prcnt / 100   + scalc.amnt * books.count  as comission,
+  e.external
+from
+  menu_items mi,
+  employees e,
+  salary_calc scalc,
+  books,
+  book_rev
+where
+  book_rev.empl_id=books.empl_id
+  and mi.code = books.mi_id
+  and e.empl_id = books.empl_id
+  and scalc.commission_grp_id = mi.commission_grp_id
+  and scalc.salary_class_id = e.salary_class_id
+  and scalc.salary_class_id =(:salary_class_id)
+  and scalc.charge_type = 'B'
+  and (scalc.tagret_amnt_max is null or scalc.tagret_amnt_max = 0 or scalc.tagret_amnt_max >= round(book_rev.month_ttl))
+  and (scalc.tagret_amnt_min is null or scalc.tagret_amnt_min = 0 or scalc.tagret_amnt_min <= round(book_rev.month_ttl))
+  and (scalc.tagret_cnt_max is null or scalc.tagret_cnt_max = 0 or scalc.tagret_cnt_max >= round(book_rev.month_cnt))
+  and (scalc.tagret_cnt_min is null or scalc.tagret_cnt_min = 0 or scalc.tagret_cnt_min <= round(book_rev.month_cnt))]]>
+         </sql>
+         <input id="salary_class_id" value="${salary_class_id}" dataType="xsd:integer"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="header">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+to_char(trunc(:d1, 'MM'), 'DD.MM.YYYY') as date_start, 
+to_char(:d1, 'DD.MM.YYYY') as date_end 
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <data>
+                  <nodeList dataSet="data" select="/ROWSET/DATA_ROW"/>
+               </data>
+               <header>
+                  <nodeList dataSet="header" select="/ROWSET/HEADER_ROW"/>
+               </header>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="salary_class_list">
+         <sql>
+            <![CDATA[select 
+  name, 
+  salary_class_id
+from 
+  salary_class
+order by
+  salary_class_id]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="To date:" format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="ename">
+         <input label="Employee: "/>
+      </parameter>
+      <parameter id="salary_class_id" dataType="xsd:integer">
+         <select label="Class: " valueSet="salary_class_list" multiple="false" all="false" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="SalaryEn">
+      <template label="SalaryEn" type="rtf" url="commissionsEn.rtf"/>
+      <template label="SalaryRu" type="rtf" url="commissionsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

@@ -1,0 +1,254 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0404 Schedule</title>
+   <description>HRS TNG3 Report 0404 Schedule</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="false"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+ordcon.booking_id||''||ordcon.resource_id||''||ordcon.secsRAW orderlogic, --used to order correctly
+ordcon.secsRAW, --raw seconds number
+ordcon.booking_id,
+ordcon.time,
+ordcon.name,
+ordcon.resource_id,
+ordcon.resource_name||' 
+'||
+  (select
+        to_char(rs.TIME_START, 'HH24:mi')||'-'||to_char(rs.TIME_END, 'HH24:mi') wrktime
+      from RESOURCE_SCHEDULE rs
+      where 
+        trunc(rs.TIME_START) = trunc(:dateon)
+        and rs.EVENT_TYPE = 'A'
+        and rs.RESOURCE_ID = ordcon.resource_id
+        and rownum=1) resource_name,
+
+--ordcon.bname,
+(case 
+
+  when 
+    (
+      ordcon.bname = LAG(ordcon.bname) OVER(ORDER BY ordcon.booking_id||''||ordcon.resource_id||''||ordcon.secsRAW asc)
+   -- and 
+     -- LEAD(ordcon.bname) OVER(ORDER BY ordcon.booking_id||''||ordcon.resource_id||''||ordcon.secsRAW asc) is not null
+    )
+    then
+      'x'
+
+    else
+      to_char(ordcon.bname)
+    end) bname
+
+from
+  (select
+    tico.secsRAW,
+    bcore.booking_id, --booking id
+    tico.time, --time allocation
+    --bcore.RESMAN_PRESET_ID, --res preset
+    bcore.name, --global name
+    bcore.resource_id, --subglobal id
+    bcore.resource_name, --subglobal name
+      to_char(bcore.time_start,'HH24:mi')||'-'||to_char(bcore.time_end,'HH24:mi')||' '|| bcore.listclient||'
+      '||bcore.bname||' '||round(bcore.price,2)||'
+      '||bcore.reference||'
+      '||bcore.listtherapist||'
+      '||bcore.listfacility||'
+      '||bcore.resource_name
+      bname --cell output
+  from 
+
+    (select
+      (co.r * 15 * 60) secsRAW,
+          TO_CHAR(TRUNC((co.r * 15 * 60)/3600),'FM9900') || ':' ||
+          TO_CHAR(TRUNC(MOD((co.r * 15 * 60),3600)/60),'FM00') || ':' ||
+          TO_CHAR(MOD((co.r * 15 * 60),60),'FM00') time -- generate seconds
+    from
+    (Select 
+    Rownum r
+    From dual
+    Connect By Rownum <= 95) co --here we get our list of 15 min periods
+    )tico, --time core
+    
+    (select
+      rp.RESMAN_PRESET_ID,
+      rp.name,
+        rpd.RESOURCE_ID,
+          br.resource_name,
+                b.booking_id,
+                b.REFERENCE,
+                b.name bname,
+                b.price,
+                (select LISTAGG(to_char(bri.RESOURCE_NAME), '; ') WITHIN GROUP (ORDER BY to_char(bri.RESOURCE_NAME)) from booking_resources bri where bri.RESOURCE_TYPE='T' and b.booking_id=bri.booking_id group by bri.booking_id) listtherapist, --failover in case several resources
+                (select LISTAGG(to_char(bri.RESOURCE_NAME), '; ') WITHIN GROUP (ORDER BY to_char(bri.RESOURCE_NAME)) from booking_resources bri where bri.RESOURCE_TYPE='F' and b.booking_id=bri.booking_id group by bri.booking_id) listfacility,  --failover in case several resources
+                (select LISTAGG(to_char(bri.RESOURCE_NAME), '; ') WITHIN GROUP (ORDER BY to_char(bri.RESOURCE_NAME)) from booking_resources bri where bri.RESOURCE_TYPE='P' and b.booking_id=bri.booking_id group by bri.booking_id) listclient,    --failover in case several resources
+            b.time_start,
+            b.time_end
+    from resman_preset rp, resman_preset_dtl rpd, BOOKING_RESOURCES br, BOOKINGS b 
+
+    where rp.RESMAN_PRESET_ID = (:res)
+      and rp.RESMAN_PRESET_ID=rpd.RESMAN_PRESET_ID
+      and rpd.RESOURCE_ID = br.RESOURCE_ID
+      and br.BOOKING_ID = b.BOOKING_ID
+      and b.status <> 'V' --dont show void bookings
+      and trunc(b.time_start) = trunc(:dateon)) bcore
+    
+  where to_char(tico.time) >= to_char(bcore.time_start,'HH24:mi:ss') and to_char(tico.time)< to_char(bcore.time_end,'HH24:mi:ss')
+  ) ordcon
+  order by ordcon.booking_id||''||ordcon.resource_id||''||ordcon.secsRAW asc]]>
+         </sql>
+         <input id="dateon" value="${dateon}" dataType="xsd:date"/>
+         <input id="res" value="${res}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:dateon) dateon,
+(:res) res
+from dual]]>
+         </sql>
+         <input id="dateon" value="${dateon}" dataType="xsd:date"/>
+         <input id="res" value="${res}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="DataSetLight">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from(
+select
+ordcon.booking_id||''||ordcon.resource_id||''||ordcon.secsRAW orderlogic, --used to order correctly
+ordcon.secsRAW, --raw seconds number
+ordcon.booking_id,
+ordcon.time,
+ordcon.name,
+ordcon.resource_id,
+ordcon.resource_name||' 
+'||
+  (select
+        to_char(rs.TIME_START, 'HH24:mi')||'-'||to_char(rs.TIME_END, 'HH24:mi') wrktime
+      from RESOURCE_SCHEDULE rs
+      where 
+        trunc(rs.TIME_START) = trunc(:dateon)
+        and rs.EVENT_TYPE = 'A'
+        and rs.RESOURCE_ID = ordcon.resource_id
+        and rownum=1) resource_name,
+
+--ordcon.bname,
+(case when 
+    (
+      ordcon.bname = LAG(ordcon.bname) OVER(ORDER BY ordcon.booking_id||''||ordcon.resource_id||''||ordcon.secsRAW asc)
+    --and 
+     -- LEAD(ordcon.bname) OVER(ORDER BY ordcon.booking_id||''||ordcon.resource_id||''||ordcon.secsRAW asc) is not null
+    )
+    then
+      'x'
+    else
+      to_char(ordcon.bname)
+    end) bname
+
+from
+  (select
+    tico.secsRAW,
+    bcore.booking_id, --booking id
+    tico.time, --time allocation
+    --bcore.RESMAN_PRESET_ID, --res preset
+    bcore.name, --global name
+    bcore.resource_id, --subglobal id
+    bcore.resource_name, --subglobal name
+      to_char(bcore.time_start,'HH24:mi')||'-'||to_char(bcore.time_end,'HH24:mi')||' '|| bcore.listclient||' '||bcore.bname||' '||bcore.resource_name
+    bname --cell output
+  from 
+
+    (select
+      (co.r * 15 * 60) secsRAW,
+          TO_CHAR(TRUNC((co.r * 15 * 60)/3600),'FM9900') || ':' ||
+          TO_CHAR(TRUNC(MOD((co.r * 15 * 60),3600)/60),'FM00') || ':' ||
+          TO_CHAR(MOD((co.r * 15 * 60),60),'FM00') time -- generate seconds
+    from
+    (Select 
+    Rownum r
+    From dual
+    Connect By Rownum <= 95) co --here we get our list of 15 min periods
+    )tico, --time core
+    
+    (select
+      rp.RESMAN_PRESET_ID,
+      rp.name,
+        rpd.RESOURCE_ID,
+          br.resource_name,
+                b.booking_id,
+                b.REFERENCE,
+                b.name bname,
+                b.price,
+                (select LISTAGG(to_char(bri.RESOURCE_NAME), '; ') WITHIN GROUP (ORDER BY to_char(bri.RESOURCE_NAME)) from booking_resources bri where bri.RESOURCE_TYPE='T' and b.booking_id=bri.booking_id group by bri.booking_id) listtherapist, --failover in case several resources
+                (select LISTAGG(to_char(bri.RESOURCE_NAME), '; ') WITHIN GROUP (ORDER BY to_char(bri.RESOURCE_NAME)) from booking_resources bri where bri.RESOURCE_TYPE='F' and b.booking_id=bri.booking_id group by bri.booking_id) listfacility,  --failover in case several resources
+                (select LISTAGG(to_char(bri.RESOURCE_NAME), '; ') WITHIN GROUP (ORDER BY to_char(bri.RESOURCE_NAME)) from booking_resources bri where bri.RESOURCE_TYPE='P' and b.booking_id=bri.booking_id group by bri.booking_id) listclient,    --failover in case several resources
+            b.time_start,
+            b.time_end
+    from resman_preset rp, resman_preset_dtl rpd, BOOKING_RESOURCES br, BOOKINGS b 
+
+    where rp.RESMAN_PRESET_ID = (:res)
+      and rp.RESMAN_PRESET_ID=rpd.RESMAN_PRESET_ID
+      and rpd.RESOURCE_ID = br.RESOURCE_ID
+      and br.BOOKING_ID = b.BOOKING_ID
+      and b.status <> 'V' --dont show void bookings
+      and trunc(b.time_start) = trunc(:dateon)) bcore
+    
+  where to_char(tico.time) >= to_char(bcore.time_start,'HH24:mi:ss') and to_char(tico.time)< to_char(bcore.time_end,'HH24:mi:ss')
+  ) ordcon
+  order by ordcon.booking_id||''||ordcon.resource_id||''||ordcon.secsRAW asc) indat
+  
+  where indat.bname <> 'x']]>
+         </sql>
+         <input id="dateon" value="${dateon}" dataType="xsd:date"/>
+         <input id="res" value="${res}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSetLight>
+                  <nodeList dataSet="DataSetLight" select="/ROWSET/DATASETLIGHT_ROW"/>
+               </DataSetLight>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="Schedule">
+         <sql>
+            <![CDATA[select name, RESMAN_PRESET_id as res from RESMAN_PRESET
+order by name]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="dateon" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="res">
+         <select label="Schedule: " valueSet="Schedule" multiple="false" all="false" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="Schedule En">
+      <template label="Schedule En" type="rtf" url="scheduleEn.rtf"/>
+      <template label="Schedule Ru" type="rtf" url="scheduleRu.rtf"/>
+      <template label="scheduleLightEn" type="rtf" url="scheduleLightEn.rtf"/>
+      <template label="scheduleLightRu" type="rtf" url="scheduleLightRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

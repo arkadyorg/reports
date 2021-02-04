@@ -1,0 +1,103 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1204 Registry composition audit</title>
+   <description>HRS TNG3 report 1204 Registry composition audit</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	emr_r_t.REGTYPE_ID,
+	emr_r_t.name,
+	emr_r_t.PREFIX,
+	emr_r.NUM,
+	--emr_r.OPEN_EMPLOYEE_ID,
+	emr_r.DATE_OPEN,
+	reg_open_emp.NAME2||' '||reg_open_emp.NAME1 reg_op_emp,
+	emr_r.DATE_CLOSE,
+	reg_close_emp.NAME2||' '||reg_close_emp.NAME1 reg_close_emp,
+	'('||emr_r.CARD_ID||') '||c.LAST_NAME||' '||c.FIRST_NAME cname,
+	emr_t.name emrname,
+	emrs.EMR_ID, 
+	emrs.TIME_OPEN,
+	emr_edit_emp.NAME2||' '||emr_edit_emp.NAME1 EMPLOYEE_ID
+
+
+from EMR_REGISTRIES emr_r, EMR_REGISTRY_TYPES emr_r_t, emrs emrs, emr_templates emr_t,
+	employees reg_open_emp, employees reg_close_emp, cards c, employees emr_edit_emp
+
+where emr_r.EMR_REGTYPE_ID = emr_r_t.REGTYPE_ID
+	and emr_r.OPEN_EMPLOYEE_ID = reg_open_emp.EMPL_ID
+	and emr_r.CLOSE_EMPLOYEE_ID = reg_close_emp.EMPL_ID(+)
+	and emr_r.CARD_ID = c.CARD_ID
+	and emr_r.REGISTRY_ID = emrs.REGISTRY_ID
+	and emrs.TEMPLATE_ID = emr_t.TEMPLATE_ID
+	and emrs.EMPLOYEE_ID = emr_edit_emp.EMPL_ID
+	and trunc(emr_r.DATE_OPEN) between trunc(:datar) and trunc(:daten)
+	and emr_r.OPEN_EMPLOYEE_ID in (:regemp_menu)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="regemp_menu" value="${regemp_menu}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="reg_emp_list">
+         <sql>
+            <![CDATA[select
+e.name2||' '||e.name1 emp,
+e.empl_id
+from employees e
+
+order by e.name2||' '||e.name1]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Registry open from:" format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Registry open till:" format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="regemp_menu">
+         <select label="Registry creator:" valueSet="reg_emp_list" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="registryCompositionAuditEn">
+      <template label="registryCompositionAuditRu" type="rtf" url="regCompAuditRu.rtf"/>
+      <template label="registryCompositionAuditEn" type="rtf" url="regCompAuditEn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

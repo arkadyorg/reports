@@ -1,0 +1,103 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1102 Menu items skills detailed</title>
+   <description>HRS TNG3 report 1102 Menu items skills detailed</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	mi.mi_id,
+	mi.mi_type,
+	mi.NAME1||' ('||mi.code||')' name1,
+	mi.si,
+	si.name siname,
+	mi.fgrp,
+	fgrp.NAME fgrpname,
+	mi.TREAT_PREP_TIME + mi.TREAT_DURATION + mi.TREAT_CLEANOUT_TIME time,
+	mi.active,
+	mis.SKILL_ID,
+	acs.name skill_name,
+	acs.RESOURCE_TYPE,
+	nvl(acs.MAX_SHARE,'0') shar,
+	asa.RESOURCE_ID,
+	nvl((f.NAME), (e.name1||' '||e.name2)) resname
+
+from 
+	menu_items mi, menu_si si, menu_fgrp fgrp, menu_item_skills mis, activity_skills acs, ACTIVITY_SKILLS_ASSIGN asa, EMPLOYEES e, FACILITIES f
+where mi.si=si.si_id
+	and mi.fgrp = fgrp.FGRP_ID
+	and mi.mi_id=mis.MI_ID 
+	and mis.SKILL_ID = acs.SKILL_ID
+	and acs.skill_id = asa.SKILL_ID
+	and asa.RESOURCE_ID = e.EMPL_ID(+)
+	and asa.RESOURCE_ID = f.FACILITIES_ID(+)
+	and mi.si in (:si_id)
+	and mi.fgrp in (:fgrp_id)
+and upper(mi.NAME1) like upper('%'||:miname||'%')
+and mi.active = 1
+
+--and mi.code = 300]]>
+         </sql>
+         <input id="si_id" value="${si_id}" dataType="xsd:integer"/>
+         <input id="fgrp_id" value="${fgrp_id}" dataType="xsd:integer"/>
+         <input id="miname" value="${miname}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="GRPs">
+         <sql>
+            <![CDATA[select si_id|| ' - '|| name, si_id from menu_si order by si_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="FGRPs">
+         <sql>
+            <![CDATA[select fgrp_id|| ' - '||name , fgrp_id  from menu_fgrp order by fgrp_id]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="miname">
+         <input label="Menu Item name:"/>
+      </parameter>
+      <parameter id="si_id" dataType="xsd:integer">
+         <select label="Sales group: " valueSet="GRPs" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="fgrp_id" dataType="xsd:integer">
+         <select label="Family group: " valueSet="FGRPs" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="menuSkillsEn">
+      <template label="menuSkillsEn" type="rtf" url="menuSkillsEn.rtf"/>
+      <template label="menuSkillsRu" type="rtf" url="menuSkillsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

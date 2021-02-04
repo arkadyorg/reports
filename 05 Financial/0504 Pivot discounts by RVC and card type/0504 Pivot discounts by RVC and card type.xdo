@@ -1,0 +1,144 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0504 Pivot discounts by RVC and card type</title>
+   <description>HRS TNG3 report 0504 Pivot discounts by RVC and card type</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="4"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+--,nvl((select name from rvc where rvc_id = (:rvcid)),'All') rvc
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    r.name RVCNAME,
+    ct.type_name,
+    sum(dd.nodisc) nodisc,
+    sum(dd.withdsc) withdsc,
+    sum(dd.dsconly) dsconly,
+    sum(dd.cou) counta
+from
+    docs d, rvc r, card_types ct,
+    (select
+        dd.doc_id,
+        sum(dd.ttl) nodisc,
+        sum(dd.ttl-dd.dsc+dd.pay_ttl_subscr) withdsc,
+        sum(dd.dsc+dd.pay_ttl_subscr) dsconly,
+        1 cou
+    from docs_dtl dd
+    where dd.void_flag is null
+
+    group by
+        dd.doc_id)dd
+
+where
+    d.doc_id(+)=dd.doc_id
+    and d.rvc = r.rvc_id
+    and d.DEF_CARD_TYPE_ID=ct.card_type_id(+)
+    and d.cofirmation='T'
+    and d.CHECK_OPEN='F'
+    and trunc(d.TM) between trunc(:datar) and trunc(:daten)
+    and d.rvc in (:rvcid)
+    and d.rvc in (select rvc_id from rvc_group_link where rvc_group_id in (:rvcgroup))
+    and ct.type_name in (:cardlist)
+    and r.site_id in (:site_list)
+
+group by
+    d.RVC,
+    r.name,
+    d.DEF_CARD_TYPE_ID,
+    ct.type_name
+
+order by 
+d.DEF_CARD_TYPE_ID]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="cardlist" value="${cardlist}" dataType="xsd:string"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="rvcid">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvcgroup">
+         <sql>
+            <![CDATA[select name, rvc_group_id as rvrcgroup from rvc_group
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="cardlist">
+         <sql>
+            <![CDATA[select type_name
+from card_types]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvcid" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvcid" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvcgroup" dataType="xsd:integer">
+         <select label="RVC group: " valueSet="rvcgroup" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="cardlist">
+         <select label="Card Type: " valueSet="cardlist" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="Pivot discounts En">
+      <template label="Pivot discounts Ru" type="rtf" url="pivotDiscountsRu.rtf"/>
+      <template label="Pivot discounts En" type="rtf" url="pivotDiscountsEn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

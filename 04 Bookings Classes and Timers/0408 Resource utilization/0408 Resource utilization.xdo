@@ -1,0 +1,235 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0408 Resource utilization</title>
+   <description>HRS TNG3 report 0408 Resource utilization </description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    intsel.resource_id,
+    intsel.resource_name,
+    trunc(intsel.dat) dat,
+    intsel.resource_type,
+    intsel.ahours,
+    intsel.uhours,
+    intsel.bhours,
+    intsel.kpi
+from 
+    (select
+        e.EMPL_ID resource_id,
+        e.NAME2||' '||e.NAME1 resource_name,
+        ares.dat,
+        'T' resource_type,
+        nvl(ares.hours,0) ahours,
+        nvl(ures.hours,0) uhours,
+        sum(nvl(bres.bhrs,0))  bhours,
+        sum((case 
+            when (nvl(ares.hours,0) - nvl(ures.hours,0) = 0) then 0
+            else 
+            ((nvl(bres.bhrs,0) * 100)/(nvl(ares.hours,0) - nvl(ures.hours,0) ))
+            end)) kpi
+    from EMPLOYEES e,        
+                    (
+                        SELECT
+                            ures.resource_id,
+                            ures.dat,
+                            sum(ures.uhrs) hours
+                        from 
+                            (
+                            select
+                                rs.resource_id,
+                                trunc(rs.TIME_START) dat,
+                                round((to_date(to_char(max(rs.time_end), 'HH24:MI'), 'HH24:MI') - 
+                                to_date(to_char(min(rs.time_start), 'HH24:MI'), 'HH24:MI'))*24, 2) as uhrs
+                            from RESOURCE_SCHEDULE rs
+                            where trunc(rs.TIME_START) between trunc(:datar) and trunc(:daten)
+                                and rs.EVENT_TYPE = 'U'
+                            group by
+                                rs.EVENT_ID,
+                                rs.resource_id,
+                                trunc(rs.TIME_START)
+                            ) ures
+                        group by
+                            ures.resource_id,
+                            ures.dat
+                    ) ures, --unavailable time
+                    (
+                        SELECT
+                            ares.resource_id,
+                            ares.dat,
+                            sum(ares.ahrs) hours
+                        from 
+                            (
+                            select
+                                rs.resource_id,
+                                trunc(rs.TIME_START) dat,
+                                round((to_date(to_char(max(rs.time_end), 'HH24:MI'), 'HH24:MI') - 
+                                to_date(to_char(min(rs.time_start), 'HH24:MI'), 'HH24:MI'))*24, 2) as ahrs
+                            from RESOURCE_SCHEDULE rs
+                            where trunc(rs.TIME_START) between trunc(:datar) and trunc(:daten)
+                                and rs.EVENT_TYPE = 'A'
+                            group by
+                                rs.EVENT_ID,
+                                rs.resource_id,
+                                trunc(rs.TIME_START)
+                            ) ares
+                        group by
+                            ares.resource_id,
+                            ares.dat
+                    ) ares, --available time
+                    
+                    (
+                    select
+                        br.RESOURCE_ID,
+                        trunc(b.TIME_START) dat,
+                        round((to_date(to_char(max(b.time_end), 'HH24:MI'), 'HH24:MI') - 
+                        to_date(to_char(min(b.time_start), 'HH24:MI'), 'HH24:MI'))*24, 2) as bhrs
+                    from bookings b, 
+                        booking_resources br
+                    where b.status not in ('V','M')
+                        and b.booking_id = br.BOOKING_ID
+                        and br.RESOURCE_TYPE ='T'
+                        and trunc(b.time_start) between trunc(:datar) and trunc(:daten)
+
+                    group by
+                        br.RESOURCE_ID,
+                        b.TIME_START
+                    ) bres --booking time
+                    
+    where e.active = 'T'
+        and e.empl_id = ares.resource_id (+)
+        and e.empl_id = ures.resource_id (+)
+        and e.empl_id = bres.RESOURCE_ID (+)
+        and ares.dat = bres.dat
+        and (ares.hours is not null) 
+
+    group by 
+        e.EMPL_ID,
+        e.NAME2,
+        e.NAME1,
+        ares.dat,
+        ares.hours,
+        ures.hours
+        
+    union all
+
+    select
+        f.FACILITIES_ID resource_id,
+        f.NAME resource_name,
+        trunc(bres.dat) dat,
+        'F' resource_type,
+        ahrs.shifthours ahours,
+        0 uhours,
+        sum(bres.bhrs) bhours,
+        sum((bres.bhrs*100)/(ahrs.shifthours)) kpi
+
+    from FACILITIES f,
+                    (
+                    select
+                        b.BOOKING_ID,
+                        br.RESOURCE_ID,
+                        round((to_date(to_char(max(b.time_end), 'HH24:MI'), 'HH24:MI') - 
+                        to_date(to_char(min(b.time_start), 'HH24:MI'), 'HH24:MI'))*24, 2) as bhrs,
+                        b.TIME_START dat,
+                        b.TIME_END
+                    from bookings b, 
+                        booking_resources br
+                    where b.status not in ('V','M')
+                        and b.booking_id = br.BOOKING_ID
+                        and br.RESOURCE_TYPE ='F'
+                        and trunc(b.time_start) between trunc(:datar) and trunc(:daten)
+
+                    group by
+                        b.BOOKING_ID,
+                        br.RESOURCE_ID,
+                        b.TIME_START,
+                        b.TIME_END
+                    ) bres,
+                    (select
+                        (send.value - sstart.value) shifthours
+                    from
+                    (
+                    select
+                        s.VALUE value
+                        from system s
+                        where s.PARAM_NAME in ('SPA_SHIFT_END')) send,
+                    (
+                    select
+                        s.VALUE value
+                        from system s
+                        where s.PARAM_NAME in ('SPA_SHIFT_START')) sstart) ahrs
+
+    where f.FACILITIES_ID = bres.RESOURCE_ID
+
+    group by
+        f.FACILITIES_ID ,
+        f.NAME ,
+        trunc(bres.dat),
+        'F' ,
+        ahrs.shifthours) intsel
+
+where intsel.resource_type in (:res_type)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="res_type" value="${res_type}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="restype">
+         <sql>
+            <![CDATA[select 'Therapists','T' from dual
+union all
+select 'Facilities','F' from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="res_type">
+         <select label="Resource type:" valueSet="restype" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="Resource utilizationEn">
+      <template label="Resource utilizationEn" type="rtf" url="resourceUtilizationEn.rtf"/>
+      <template label="Resource utilizationRu" type="rtf" url="resourceUtilizationRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

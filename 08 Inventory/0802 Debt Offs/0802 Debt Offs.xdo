@@ -1,0 +1,132 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0802 Debt Offs</title>
+   <description>HRS TNG3 report 0802 Debt Offs</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="2"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="dataset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+  idd.date_tm,
+  idd.confirmation,
+  idd.inv_docs_id,
+  is1.name as src_store_name,
+  idd.mod_operator,
+  idd.amount,
+  idd.notes
+from
+  inv_docs idd, inv_store is1, rvc r
+where
+    idd.src_store_id = is1.inv_store_id
+  and trunc(idd.date_tm) between trunc(sysdate) and trunc(sysdate)
+  and idd.dst_store_id is null
+  and is1.INV_STORE_ID = r.treat_store_id
+  and idd.src_store_id = nvl(:src_store_id, idd.src_store_id)
+  --and idd.mod_operator = nvl(:mod_operator_name, idd.mod_operator) --future dev
+  and r.rvc_id = nvl(:rvc_id, r.rvc_id)]]>
+         </sql>
+         <input id="src_store_id" value="${src_store_id}" dataType="xsd:integer"/>
+         <input id="mod_operator_name" value="${mod_operator_name}" dataType="xsd:string"/>
+         <input id="rvc_id" value="${rvc_id}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+(:date_from) as report_start,
+(:date_to) as report_end,
+
+nvl((select name from rvc where rvc_ID = (:rvc_id)),'All') rvc_id,
+nvl((select name from inv_store where inv_store_id = (:src_store_id)),'All') src_store_id
+
+from dual]]>
+         </sql>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+         <input id="rvc_id" value="${rvc_id}" dataType="xsd:integer"/>
+         <input id="src_store_id" value="${src_store_id}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <dataset>
+                  <nodeList dataSet="dataset" select="/ROWSET/DATASET_ROW"/>
+               </dataset>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="store_list">
+         <sql>
+            <![CDATA[select 
+  name,
+  inv_store_id
+from
+  inv_store
+where
+  retail_rvc_id = nvl(:rvc_id, retail_rvc_id)
+order by
+  inv_store_id]]>
+         </sql>
+         <input id="rvc_id" value="${rvc_id}" dataType="xsd:integer"/>
+      </valueSet>
+      <valueSet id="operator_list">
+         <sql>
+            <![CDATA[select 
+  distinct
+  mod_operator
+from
+  inv_docs
+where
+  mod_operator is not null
+order by
+  mod_operator]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvc_list">
+         <sql>
+            <![CDATA[select 
+  name,
+  rvc_id
+from 
+  rvc
+order by
+  rvc_id]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="date_from" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="date_to" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="rvc_id" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvc_list" multiple="false" all="true" allValue="null" refreshParameters="true"/>
+      </parameter>
+      <parameter id="mod_operator_name">
+         <select label="Operator: " valueSet="operator_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="src_store_id" dataType="xsd:integer">
+         <select label="Source store: " valueSet="store_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="debtOffEn">
+      <template label="debtOffRu" type="rtf" url="debtOffsRu.rtf"/>
+      <template label="debtOffEn" type="rtf" url="debtOffsEn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

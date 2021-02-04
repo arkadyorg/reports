@@ -1,0 +1,140 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0503 Discounted checks</title>
+   <description>HRS TNG3 report 0503 Discounted checks</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="4"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+    inc.chknum,
+    inc.tm,
+    inc.operator,
+    inc.rvc,
+    inc.gname,
+    inc.cardnum,
+    inc.TYPE_NAME,
+    inc.chktotal,
+    inc.dsctotal,
+    inc.dscpercent,
+    inc.dsc_reason
+FROM
+    (select
+        d.CHKNUM as chknum,
+        d.tm as tm,
+        d.OPERATOR as operator,
+        r.name as rvc,
+        c.LAST_NAME||' '||c.FIRST_NAME as gname,
+        c.MAGSTRIPE as cardnum,
+        ct.TYPE_NAME,
+        trim(TO_CHAR(d.TTL,'99999999999999999.99')) chktotal,
+        trim(TO_CHAR(sum(dtl.dsc),'99999999999999999.99')) dsctotal,
+        trim(TO_CHAR((case when d.TTL = 0 then 0
+            else (sum(dtl.dsc)/d.TTL)*100 
+            end),'99999999999999999')) dscpercent,
+        LISTAGG(to_char(dtl.dsc_reason), ', ') WITHIN GROUP (ORDER BY dtl.dsc_reason) dsc_reason
+    from docs d, docs_dtl dtl, cards c, rvc r, card_types ct
+    where dtl.DOC_ID = d.DOC_ID
+        and d.CHECK_OPEN = 'F'
+        and d.COFIRMATION = 'T'
+        and dtl.void_flag is null
+        and c.CARD_ID = d.DEF_CARD_ID
+        and r.RVC_ID = d.RVC
+        and d.DEF_CARD_TYPE_ID=ct.card_type_id
+        and r.name in (:rvc)
+        and ct.type_name in (:ctype)
+        and trunc(d.tm) between trunc(:datefrom) and trunc(:dateto)
+        and r.site_id in (:site_list)
+        and dtl.dsc !=0    
+    group by d.CHKNUM, d.TM, d.OPERATOR, r.name, c.LAST_NAME||' '||c.FIRST_NAME, c.MAGSTRIPE, ct.TYPE_NAME, d.TTL, ct.type_name) inc
+where inc.dscpercent between (:percFrom) and (:percTo)]]>
+         </sql>
+         <input id="rvc" value="${rvc}" dataType="xsd:string"/>
+         <input id="ctype" value="${ctype}" dataType="xsd:string"/>
+         <input id="datefrom" value="${datefrom}" dataType="xsd:date"/>
+         <input id="dateto" value="${dateto}" dataType="xsd:date"/>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+         <input id="percFrom" value="${percFrom}" dataType="xsd:integer"/>
+         <input id="percTo" value="${percTo}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datefrom) datar,
+(:dateto) daten
+from dual]]>
+         </sql>
+         <input id="datefrom" value="${datefrom}" dataType="xsd:date"/>
+         <input id="dateto" value="${dateto}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name from rvc order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="ctype">
+         <sql>
+            <![CDATA[select type_name from card_types order by type_name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvc">
+         <select label="RVC: " valueSet="rvc" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="ctype">
+         <select label="Card Type: " valueSet="ctype" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="datefrom" defaultValue="{$sysdate()-1$}" dataType="xsd:date">
+         <date label="Date from: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="dateto" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Date to: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="percFrom" defaultValue="0" dataType="xsd:integer">
+         <input label="Percent From:" size="3"/>
+      </parameter>
+      <parameter id="percTo" defaultValue="100" dataType="xsd:integer">
+         <input label="Percent To:" size="3"/>
+      </parameter>
+   </parameters>
+   <templates default="discountedChecksByRVC En">
+      <template label="discountedChecksByRVC En" type="rtf" url="DiscountedChecksByRVC En.rtf"/>
+      <template label="discountedChecksByRVC Ru" type="rtf" url="DiscountedChecksByRVC Ru.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

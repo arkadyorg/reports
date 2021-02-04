@@ -1,0 +1,153 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0803 External documents report</title>
+   <description>HRS TNG3 report 0803 External documents report</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="2"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="dataset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+  idd.date_tm,
+  idd.confirmation,
+  idd.inv_docs_id,
+  iss.name as supplier_name,
+  is2.name as dest_store_name,
+  idd.mod_operator,
+  idd.amount,
+  idd.notes
+from
+  inv_docs idd, inv_store is2, inv_suppliers iss
+where
+  is2.inv_store_id = idd.dst_store_id
+  and iss.inv_supplier_id = idd.inv_supplier_id
+  and trunc(idd.date_tm) between :date_from and :date_to
+  and idd.src_store_id is null
+  and idd.dst_store_id = nvl(:dst_store_id, idd.dst_store_id)
+  and idd.mod_operator = nvl(:mod_operator_name, idd.mod_operator)
+  and idd.inv_supplier_id = nvl(:supplier_id, idd.inv_supplier_id)
+
+  and is2.retail_rvc_id = nvl(:rvc_id, is2.retail_rvc_id)]]>
+         </sql>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+         <input id="dst_store_id" value="${dst_store_id}" dataType="xsd:integer"/>
+         <input id="mod_operator_name" value="${mod_operator_name}" dataType="xsd:string"/>
+         <input id="supplier_id" value="${supplier_id}" dataType="xsd:integer"/>
+         <input id="rvc_id" value="${rvc_id}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:date_from) date_from,
+(:date_to) date_to,
+nvl((select name from rvc_group where rvc_group_id = (:rvclist)),'All') rvclist,
+nvl((select name from inv_suppliers where INV_SUPPLIER_ID = (:supplier_id)),'All') supplier_id,
+nvl((select name from inv_store where INV_STORE_ID = (:dst_store_id)),'All') dst_store_id,
+nvl((select name2||' '||name1 from employees where name2||' '||name1 = (:mod_operator_name)),'All') mod_operator_name
+from dual]]>
+         </sql>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+         <input id="supplier_id" value="${supplier_id}" dataType="xsd:integer"/>
+         <input id="dst_store_id" value="${dst_store_id}" dataType="xsd:integer"/>
+         <input id="mod_operator_name" value="${mod_operator_name}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <dataset>
+                  <nodeList dataSet="dataset" select="/ROWSET/DATASET_ROW"/>
+               </dataset>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="store_list">
+         <sql>
+            <![CDATA[select 
+  name,
+  inv_store_id
+from
+  inv_store
+where
+  retail_rvc_id = nvl(:rvc_id, retail_rvc_id)
+order by
+  inv_store_id]]>
+         </sql>
+         <input id="rvc_id" value="${rvc_id}" dataType="xsd:integer"/>
+      </valueSet>
+      <valueSet id="operator_list">
+         <sql>
+            <![CDATA[select 
+  distinct
+  mod_operator
+from
+  inv_docs
+where
+  mod_operator is not null
+order by
+  mod_operator]]>
+         </sql>
+      </valueSet>
+      <valueSet id="supplier_list">
+         <sql>
+            <![CDATA[select
+  name,
+  inv_supplier_id
+from
+  inv_suppliers
+order by
+  name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvc_list">
+         <sql>
+            <![CDATA[select 
+  name,
+  rvc_id
+from 
+  rvc
+order by
+  rvc_id]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="date_from" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="date_to" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="rvc_id" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvc_list" multiple="false" all="true" allValue="null" refreshParameters="false"/>
+      </parameter>
+      <parameter id="supplier_id" dataType="xsd:integer">
+         <select label="Supplier: " valueSet="supplier_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="dst_store_id" dataType="xsd:integer">
+         <select label="Destination store: " valueSet="store_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="mod_operator_name">
+         <select label="Operator: " valueSet="operator_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="externalDocsEn">
+      <template label="externalDocsEn" type="rtf" url="externalDocsEn.rtf"/>
+      <template label="externalDocsRu" type="rtf" url="externalDocsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

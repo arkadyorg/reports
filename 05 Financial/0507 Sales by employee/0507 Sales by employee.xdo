@@ -1,0 +1,222 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0507 Sales by employee</title>
+   <description>HRS TNG3 report 0507 Sales by employee</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="true"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="sales">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	dd.name,
+	dd.name ITEM_NAME,
+	mi.code,
+	E.NAME2 || ' ' || E.NAME1 OPERATOR,
+	ms.NAME as MAJGRP,
+	mf.NAME as SUBGRP,
+	   SUM(dd.COUNT) as COUNT,
+	   SUM(dd.TTL-dd.DSC+dd.PAY_TTL_SUBSCR) as TTL,
+	   SUM(dd.DSC) as DSC,
+	   SUM(dd.TAX_ADDON) as TAX,
+	   SUM(dd.PAY_TTL_SUBSCR) as PAY_TTL_SUBSCR 
+
+
+from
+	MENU_FGRP mf,
+	MENU_SI ms,
+	DOCS D, 
+	DOCS_DTL dd
+	,employees e
+	,menu_items mi
+	,rvc r
+
+where
+	dd.COMISSION_EMPL_ID=E.EMPL_ID
+	and D.DOC_ID=dd.DOC_ID
+	and ms.SI_ID=dd.SI
+	and  mf.FGRP_ID=dd.FGRP
+	and dd.mi_id=mi.code
+	and d.rvc=r.rvc_id
+	and d.cofirmation='T'
+	and d.CHECK_OPEN='F'
+	and dd.void_flag is null
+  
+	
+	and trunc(d.tm) between trunc(:datefrom) and trunc(:dateto)
+	and r.site_id in (:siteid)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:si_id is null or dd.si=:si_id)
+	and (:fgrp_id is null or dd.fgrp=:fgrp_id)
+	and LOWER(dd.name) like LOWER(nvl('%'||:itemname ||'%', dd.name))
+	and (:empl_id is null or dd.comission_empl_id=:empl_id)
+
+GROUP BY dd.mi_id, dd.name, ms.NAME, mf.NAME, mi.code, 
+E.NAME2 || ' ' || E.NAME1, dd.comission_empl_id]]>
+         </sql>
+         <input id="datefrom" value="${datefrom}" dataType="xsd:date"/>
+         <input id="dateto" value="${dateto}" dataType="xsd:date"/>
+         <input id="siteid" value="${siteid}" dataType="xsd:string"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="si_id" value="${si_id}" dataType="xsd:integer"/>
+         <input id="fgrp_id" value="${fgrp_id}" dataType="xsd:integer"/>
+         <input id="itemname" value="${itemname}" dataType="xsd:string"/>
+         <input id="empl_id" value="${empl_id}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="Header">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+nvl((select name from rvc_group where rvc_group_id = (:rvcgroup)),'All') rvcs,
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:datefrom, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:dateto, 'DD.MM.YYYY') as report_end
+from dual]]>
+         </sql>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="datefrom" value="${datefrom}" dataType="xsd:date"/>
+         <input id="dateto" value="${dateto}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DTLD_SALES">
+         <sql fixedSchema="false">
+            <![CDATA[select
+dd.name D_ITEM_NAME,
+mi.code D_CODE,
+E.NAME2 || ' ' || E.NAME1 D_OPERATOR,
+ms.NAME as D_MAJGRP,
+mf.NAME as D_SUBGRP,
+   SUM(dd.COUNT) as D_COUNT,
+   SUM(dd.TTL-dd.DSC+dd.PAY_TTL_SUBSCR) as D_TTL,
+   SUM(dd.DSC) as D_DSC,
+   SUM(dd.TAX_ADDON) as D_TAX,
+   SUM(dd.PAY_TTL_SUBSCR) as D_PAY_TTL_SUBSCR,
+   d.chknum D_CHKNUM,
+   d.bussines_date D_BUSSINESS_DATE
+
+
+from
+	MENU_FGRP mf,
+	MENU_SI ms,
+	DOCS D, 
+	DOCS_DTL dd
+	,employees e
+	,menu_items mi
+
+where
+	dd.COMISSION_EMPL_ID=E.EMPL_ID
+	and D.DOC_ID=dd.DOC_ID
+	and ms.SI_ID=dd.SI
+	and  mf.FGRP_ID=dd.FGRP
+	and dd.mi_id=mi.code
+	and d.cofirmation='T'
+	and d.CHECK_OPEN='F'
+	and dd.void_flag is null
+	and trunc(d.tm) between trunc(:datefrom) and trunc(:dateto)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:si_id is null or dd.si=:si_id)
+	and (:fgrp_id is null or dd.fgrp=:fgrp_id)
+	and LOWER(dd.name) like LOWER(nvl('%'||:itemname ||'%', dd.name))
+	and (:empl_id is null or dd.comission_empl_id=:empl_id)
+
+
+GROUP BY dd.mi_id, dd.name, ms.NAME, mf.NAME, mi.code, 
+E.NAME2 || ' ' || E.NAME1, dd.comission_empl_id,
+d.chknum, d.bussines_date]]>
+         </sql>
+         <input id="datefrom" value="${datefrom}" dataType="xsd:date"/>
+         <input id="dateto" value="${dateto}" dataType="xsd:date"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="si_id" value="${si_id}" dataType="xsd:integer"/>
+         <input id="fgrp_id" value="${fgrp_id}" dataType="xsd:integer"/>
+         <input id="itemname" value="${itemname}" dataType="xsd:string"/>
+         <input id="empl_id" value="${empl_id}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <sales>
+                  <nodeList dataSet="sales" select="/ROWSET/SALES_ROW"/>
+               </sales>
+               <Header>
+                  <nodeList dataSet="Header" select="/ROWSET/HEADER_ROW"/>
+               </Header>
+               <DTLD_SALES>
+                  <nodeList dataSet="DTLD_SALES" select="/ROWSET/DTLD_SALES_ROW"/>
+               </DTLD_SALES>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="RVC Groups">
+         <sql>
+            <![CDATA[select name, rvc_group_id as rvrcgroup from rvc_group
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="GRPs">
+         <sql>
+            <![CDATA[select si_id|| ' - '|| name, si_id from menu_si order by si_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="FGRPs">
+         <sql>
+            <![CDATA[select fgrp_id|| ' - '||name , fgrp_id  from menu_fgrp order by fgrp_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="EMPLs">
+         <sql>
+            <![CDATA[select 
+distinct e.name2 || ' ' || e.name1 as employee, e.empl_id as empl_id
+from docs_dtl dtl, employees e
+where dtl.comission_empl_id=e.empl_id(+)
+order by e.name2 || ' ' || e.name1]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select name, site_id as siteid from sites
+order by name]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="siteid">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov" refreshParameters="true"/>
+      </parameter>
+      <parameter id="rvcgroup" dataType="xsd:integer">
+         <select label="RVC group: " valueSet="RVC Groups" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="datefrom" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="Date from: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="dateto" defaultValue="{$SYSDATE()$}" dataType="xsd:date">
+         <date label="Date to: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="si_id" dataType="xsd:integer">
+         <select label="Sales group: " valueSet="GRPs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="fgrp_id" dataType="xsd:integer">
+         <select label="Family group: " valueSet="FGRPs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="itemname">
+         <input label="Item name: "/>
+      </parameter>
+      <parameter id="empl_id" dataType="xsd:integer">
+         <select label="Employee: " valueSet="EMPLs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="By employeeEn">
+      <template label="By employeeEn" type="rtf" url="salesByEmployeeEn.rtf"/>
+      <template label="By employeeRu" type="rtf" url="salesByEmployeeRu.rtf"/>
+      <template label="Detailed by employee En" type="rtf" url="salesDtldByEmployeeEn.rtf"/>
+      <template label="Detailed by employee Ru" type="rtf" url="salesDtldByEmployeeRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

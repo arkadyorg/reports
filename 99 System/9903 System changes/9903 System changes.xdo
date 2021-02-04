@@ -1,0 +1,104 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>9903 System changes</title>
+   <description>HRS TNG3 report 9903 System changes</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="2"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="dataset">
+      <dataSet id="dataset">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+  :date_from as report_start,
+  :date_to as report_end,
+  al.id,
+  to_char(al.tm, 'dd.mm.yyyy HH24:MI:ss') as event_time,
+  decode(al.event_type, 'D', 'Deleted', 'U', 'Updated', 'N', 'New') as event_type,
+  al.key_value,
+  al.operator,
+  al.tbl, 
+  ald.fld,
+  ald.old_value,
+  ald.new_value, 
+  ald.old_reference,
+  ald.new_reference
+from 
+  audit_log al,
+  audit_log_dtl ald 
+where
+  al.id = ald.log_id
+  and al.tbl = nvl(:table_name, al.tbl)
+  and al.event_type = nvl(:event_type, al.event_type)
+  --and to_date(to_char(al.tm, 'dd.MM.yyyy'), 'dd.MM.yyyy') between :date_from and :date_to
+  and al.operator = nvl(:operator_name, al.operator)
+  and al.tm between trunc(:date_from) and trunc(:date_to)+1]]>
+         </sql>
+         <input id="date_from" value="${date_from}" dataType="xsd:date"/>
+         <input id="date_to" value="${date_to}" dataType="xsd:date"/>
+         <input id="table_name" value="${table_name}" dataType="xsd:string"/>
+         <input id="event_type" value="${event_type}" dataType="xsd:string"/>
+         <input id="operator_name" value="${operator_name}" dataType="xsd:string"/>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="table_list">
+         <sql>
+            <![CDATA[select 
+  tbl_name 
+from 
+  audit_log_tbls 
+group by 
+  tbl_name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="eventtype_list">
+         <nvPairs>
+            <nvPair label="Deleted" value="D"/>
+            <nvPair label="Updated" value="U"/>
+            <nvPair label="New" value="N"/>
+         </nvPairs>
+      </valueSet>
+      <valueSet id="operator_list">
+         <sql>
+            <![CDATA[select 
+  distinct 
+  trim(operator) as operator
+from 
+  audit_log
+where
+  operator is not null
+order by
+  operator]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="date_from" defaultValue="{$sysdate()-1$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="date_to" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="table_name">
+         <select label="Table name: " valueSet="table_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="event_type">
+         <select label="Event: " valueSet="eventtype_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="operator_name">
+         <select label="Operator: " valueSet="operator_list" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="systemChangesEn">
+      <template label="systemChangesRu" type="rtf" url="systemChangesRu.rtf"/>
+      <template label="systemChangesEn" type="rtf" url="systemChangesEn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

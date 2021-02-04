@@ -1,0 +1,161 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1101 Menu</title>
+   <description>HRS TNG3 report 1101 Menu</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="DataSet">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select   
+  --TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+  MENU_ITEMS.CODE as CODE,
+  MENU_ITEMS.NAME1 as NAME1,
+  MENU_ITEMS.NAME2 as NAME2,
+  MENU_ITEMS.BARCODE as barcode,
+  MENU_ITEMS.ACTIVE active,
+  MCG.name mcgname,
+  MENU_SI.NAME as SI,
+  MENU_FGRP.NAME as FGRP,
+  emr_t.name,
+  rt.text,
+  MENU_PRICE.PRICE as PRICE,
+  tc.name as tcname
+
+from   
+  MENU_PRICE MENU_PRICE,
+  MENU_FGRP MENU_FGRP,
+  MENU_SI MENU_SI,
+  MENU_ITEMS MENU_ITEMS,
+  MENU_COMMISSION_GRP MCG,
+  EMR_TEMPLATES EMR_T,
+  reason_text rt,
+  tax_classes tc
+
+
+where MENU_ITEMS.SI=MENU_SI.SI_ID
+  and MENU_ITEMS.FGRP=MENU_FGRP.FGRP_ID
+  and MENU_ITEMS.MI_ID=MENU_PRICE.MI_ID
+  and MENU_ITEMS.COMMISSION_GRP_ID = MCG.COMMISSION_GRP_ID
+  and MENU_PRICE.ORDR in (
+						select ordr 
+						from menu_price mpp 
+  					 	where mpp.mi_id = MENU_ITEMS.mi_id and( 
+										  					   (nvl(mpp.valid_from,sysdate)<=nvl(:daten, sysdate) and 
+										  					   nvl(mpp.valid_till,sysdate)>=nvl(:datar, sysdate)) 
+										  					   or (mpp.valid_from is null and mpp.valid_till is null) 
+										  					   )
+  						)
+  and (:si_id is null or MENU_ITEMS.si=:si_id)
+  and (:fgrp_id is null or MENU_ITEMS.fgrp=:fgrp_id)
+  and (LOWER(MENU_ITEMS.NAME1) like LOWER(nvl('%'||:itemname ||'%', MENU_ITEMS.NAME1))
+  or LOWER(MENU_ITEMS.NAME2) like LOWER(nvl('%'||:itemname ||'%',MENU_ITEMS.NAME2)))
+  and (:itemcode is null or MENU_ITEMS.CODE=:itemcode)
+  and (:sel_hier is null or :sel_hier = MENU_ITEMS.hierarchy_id)
+  and MENU_ITEMS.ACTIVE in (:anstat)
+  and menu_items.EMR_TYPE = EMR_T.template_id(+)
+  and menu_items.med_category_id = RT.reason_text_id(+)
+  and menu_items.tax_class = tc.TAX_CLASS_ID(+)
+  and tc.tax_class_id in (:tax_class)
+
+order by to_number(MENU_ITEMS.code)]]>
+         </sql>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="si_id" value="${si_id}" dataType="xsd:integer"/>
+         <input id="fgrp_id" value="${fgrp_id}" dataType="xsd:integer"/>
+         <input id="itemname" value="${itemname}" dataType="xsd:string"/>
+         <input id="itemcode" value="${itemcode}" dataType="xsd:string"/>
+         <input id="sel_hier" value="${sel_hier}" dataType="xsd:string"/>
+         <input id="anstat" value="${anstat}" dataType="xsd:string"/>
+         <input id="tax_class" value="${tax_class}" dataType="xsd:string"/>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="GRPs">
+         <sql>
+            <![CDATA[select si_id|| ' - '|| name, si_id from menu_si order by si_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="FGRPs">
+         <sql>
+            <![CDATA[select fgrp_id|| ' - '||name , fgrp_id  from menu_fgrp order by fgrp_id]]>
+         </sql>
+      </valueSet>
+      <valueSet id="folders">
+         <sql>
+            <![CDATA[select  
+((select h1.name || ' - ' || h2.name from dictionary_hierarchy h1, dictionary_hierarchy h2
+where h2.hierarchy_id=dict.parent_id and h1.hierarchy_id=h2.parent_id
+) || ' - ' || dict.name || 
+' (' || (select count(*) from menu_items 
+where hierarchy_id=dict.hierarchy_id) || ')') as folder,
+dict.hierarchy_id as sel_hier
+from dictionary_hierarchy dict
+where 
+dict.hierarchy_id 
+  in (select distinct(hierarchy_id) 
+  from menu_items)
+order by folder]]>
+         </sql>
+      </valueSet>
+      <valueSet id="anstatus">
+         <sql>
+            <![CDATA[select 'Inactive',0 from dual
+union all
+select 'Active',1 from dual]]>
+         </sql>
+      </valueSet>
+      <valueSet id="taxclass">
+         <sql>
+            <![CDATA[select
+tc.name,
+tc.tax_class_id
+from tax_classes tc
+order by tc.name asc]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="si_id" dataType="xsd:integer">
+         <select label="Sales group: " valueSet="GRPs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="fgrp_id" dataType="xsd:integer">
+         <select label="Family group: " valueSet="FGRPs" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="sel_hier">
+         <select label="Folder: " valueSet="folders" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="datar" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="itemname">
+         <input label="Item: "/>
+      </parameter>
+      <parameter id="itemcode">
+         <input label="Item code: "/>
+      </parameter>
+      <parameter id="anstat">
+         <select label="Item status: " valueSet="anstatus" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="tax_class">
+         <select label="Tax class:" valueSet="taxclass" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="menuEN">
+      <template label="menuEN" type="rtf" url="menuEn.rtf"/>
+      <template label="menuRU" type="rtf" url="menuRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

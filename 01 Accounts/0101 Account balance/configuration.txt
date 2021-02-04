@@ -1,0 +1,3 @@
+Edit ur parameter to see detailed forms
+Sample configuration: 
+/xmlpserver/STANDARD TNG3 Reports/Hotel Name/__in process/Account balance detailed/Account balance detailed.xdo?_xpf=&_xpt=0&_xdo=%2FSTANDARD%20TNG3%20Reports%2FHotel%20Name%2F__in%20process%2FAccount%20balance%20detailed%2FAccount%20balance%20detailed.xdo

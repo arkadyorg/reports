@@ -1,0 +1,95 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1205 Medi bookings list</title>
+   <description>HRS TNG3 report 1205 Medi bookings list</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	b.name,
+	b.TIME_START,
+	b.TIME_END,
+	b.name bookname,
+	nvl(b.reference,' ')reference,
+	terlist.resource_id ter_id,
+	terlist.resource_name terapist,
+	'('||clientlist.resource_id||') '||clientlist.resource_name client
+
+from bookings b, menu_items mi,
+								(select
+								*
+								from BOOKING_RESOURCES br
+								where br.RESOURCE_TYPE = 'T')terlist,
+								(select
+								*
+								from BOOKING_RESOURCES br
+								where br.RESOURCE_TYPE = 'P')clientlist
+
+where b.mi_id = mi.mi_id
+	and mi.EMR_TYPE is not null
+	and b.status not in ('V', 'M')
+	and b.booking_id = terlist.booking_id
+	and trunc(b.TIME_START) = trunc(:datar)
+	and b.booking_id = clientlist.booking_id(+)
+and terlist.resource_id in (:mediemp_menu)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="mediemp_menu" value="${mediemp_menu}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="mediemp_list">
+         <sql>
+            <![CDATA[select
+e.name2||' '||e.name1 emp,
+e.empl_id
+from employees e
+
+order by e.name2||' '||e.name1]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="Date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="mediemp_menu">
+         <select label="Doctor: " valueSet="mediemp_list" multiple="true" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="mediBookingListEn">
+      <template label="mediBookingListRu" type="rtf" url="mediBookListRu.rtf"/>
+      <template label="mediBookingListEn" type="rtf" url="mediBookListEn.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

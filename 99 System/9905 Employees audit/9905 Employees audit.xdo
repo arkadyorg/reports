@@ -1,0 +1,108 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>9905 Employees audit</title>
+   <description>HRS TNG3 report 9905 Employees audit</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	e.NAME2 ||' '||e.name1 fio,
+	e.logon,
+	e.SALARY_CLASS_ID,
+	sc.NAME salary_name,
+	e.ROLE_ID,
+	ur.name rolename,
+	e.ACTIVE,
+	e.EXTERNAL,
+	e.CURRENT_RVC_ID,
+	r.name rvcname,
+	e.ALLOWED_RVC_GROUP_ID,
+	rg.NAME rvcgroupname,
+	e.PASSWORD_CHANGE_TM,
+	e.EMAIL,
+	e.PHONE,
+	e.GENDER,
+	e.magstripe,
+	e.FORCE_CHANGE_PWD,
+	e.FAILED_LOGIN_CNT,
+	e.FAILED_LOGIN_TM,
+	e.CREATE_DATE
+
+from employees e, salary_class sc, users_roles ur, rvc r, RVC_GROUP rg
+
+where e.SALARY_CLASS_ID = sc.SALARY_CLASS_ID(+)
+	and e.role_id = ur.ROLE_ID(+)
+	and e.CURRENT_RVC_ID = r.RVC_ID(+)
+	and e.ALLOWED_RVC_GROUP_ID = rg.RVC_GROUP_ID(+)
+	and e.ACTIVE in (:activeflag)
+	--and e.SALARY_CLASS_ID =nvl(:salaryclass,e.SALARY_CLASS_ID)
+	--and e.ROLE_ID in (:userroles)]]>
+         </sql>
+         <input id="activeflag" value="${activeflag}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+*
+from dual]]>
+         </sql>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="salary_class">
+         <sql>
+            <![CDATA[select
+to_char(sc.name) name,
+to_char(sc.SALARY_CLASS_ID) SALARY_CLASS_ID
+from salary_class sc]]>
+         </sql>
+      </valueSet>
+      <valueSet id="user_roles">
+         <sql>
+            <![CDATA[select
+ur.name,
+ur.ROLE_ID
+from users_roles ur]]>
+         </sql>
+      </valueSet>
+      <valueSet id="activeoptions">
+         <sql>
+            <![CDATA[select 'Not active','F' from dual
+union all
+select 'Active','T' from dual]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="activeflag">
+         <select label="Active flag:" valueSet="activeoptions" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="Employees audit Ru">
+      <template label="Employees audit En" type="rtf" url="emplAuditEn.rtf"/>
+      <template label="Employees audit Ru" type="rtf" url="emplAuditRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

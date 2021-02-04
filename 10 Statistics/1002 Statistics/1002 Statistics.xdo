@@ -1,0 +1,296 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>1002 Statistics</title>
+   <description>HRS TNG3 report 1002 Statistics</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten
+from
+dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet 1">
+         <sql fixedSchema="false">
+            <![CDATA[/*Clients raiting by amount*/
+select
+*
+from
+	(
+	select
+	c.card_id||' '||c.last_name||' '||c.first_name||' '||last_name fio,
+	sum(d.ttl)
+	from docs d, cards c, CARD_TYPES ct
+	where d.def_card_id=c.card_id
+	and d.def_card_id <> 2 --Micros Statistics exclude
+	and d.CHECK_OPEN = 'F'
+	and d.cofirmation = 'T'
+	and c.CARD_TYPE_ID=ct.card_type_id
+	and trunc(d.tm) between trunc(:datar) and trunc(:daten)
+	group by
+	c.card_id||' '||c.last_name||' '||c.first_name||' '||last_name
+	order by  sum(d.ttl) desc)
+where rownum <= 10]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet 2">
+         <sql fixedSchema="false">
+            <![CDATA[/*Top booked guests*/
+select
+'('||c.card_id||') '||c.LAST_NAME||' '||c.FIRST_NAME||' '||c.SECOND_NAME fio,
+a.ama
+from
+	(
+	select
+	br.resource_id,
+	br.RESOURCE_NAME,
+	sum(1) ama
+	from bookings b, booking_resources br 
+	where b.booking_id=br.booking_id
+	and br.RESOURCE_TYPE='P'
+	and b.status <> 'V'
+	and trunc(b.TIME_START) between trunc(:datar) and trunc(:daten)
+	group by br.resource_id, br.RESOURCE_NAME
+	order by sum(1) desc) a, cards c, card_types ct
+where rownum <=10
+and a.resource_id=c.card_id
+and c.card_type_id=ct.CARD_TYPE_ID]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet 3">
+         <sql fixedSchema="false">
+            <![CDATA[/*Top booked active members*/
+select
+'('||c.card_id||') '||c.LAST_NAME||' '||c.FIRST_NAME||' '||c.SECOND_NAME fio,
+a.ama
+from
+	(
+	select
+	br.resource_id,
+	br.RESOURCE_NAME,
+	sum(1) ama
+	from bookings b, booking_resources br 
+	where b.booking_id=br.booking_id
+	and br.RESOURCE_TYPE='P'
+	and b.status <> 'V'
+	and br.RESOURCE_ID in  
+						(
+						select distinct
+						sa.card_id
+						from SUBSCRIPTION_ACCOUNTING sa
+						where sa.status = 2
+						)
+	and trunc(b.TIME_START) between trunc(:datar) and trunc(:daten)
+	group by br.resource_id, br.RESOURCE_NAME
+	order by sum(1) desc) a, cards c, card_types ct
+where rownum <=10
+and a.resource_id=c.card_id
+and c.card_type_id=ct.CARD_TYPE_ID]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet 4">
+         <sql fixedSchema="false">
+            <![CDATA[/*Top booked Treatments*/
+
+select
+*
+from
+	(
+	select
+	b.mi_id,
+	b.name,
+	sum(1)
+	from bookings b
+	where b.status <> 'V'
+	and trunc(b.time_start) between trunc(:datar) and trunc(:daten)
+	group by
+	b.mi_id,
+	b.name
+	order by sum(1) desc)
+where rownum <= 10]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet 5">
+         <sql fixedSchema="false">
+            <![CDATA[/*Top performed therapists*/
+select
+*
+from
+	(
+	select
+	br.RESOURCE_ID,
+	br.RESOURCE_NAME,
+	sum(1) ama
+	from bookings b, BOOKING_RESOURCES br, employees e
+	where b.booking_id=br.booking_id
+	and br.RESOURCE_TYPE='T'
+	and b.status <> 'V'
+	and b.doc_id is not null
+	and br.RESOURCE_ID = e.empl_id
+	and e.ACTIVE='T'
+	and trunc(b.time_start) between trunc(:datar) and trunc(:daten)
+
+	group by
+	br.RESOURCE_ID,
+	br.RESOURCE_NAME
+	  
+	order by sum(1) desc)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet 6">
+         <sql fixedSchema="false">
+            <![CDATA[/*Top requested (red) therapists*/
+select
+*
+from
+	(
+	select
+	br.RESOURCE_ID,
+	br.RESOURCE_NAME,
+	sum(1) ama
+	from bookings b, BOOKING_RESOURCES br, employees e
+	where b.booking_id=br.booking_id
+	and br.RESOURCE_TYPE='T'
+	and b.status <> 'V'
+	and b.doc_id is not null
+	and br.RESOURCE_ID = e.empl_id
+	and e.ACTIVE='T'
+	and b.color='16007990' --red color
+	and trunc(b.time_start) between trunc(:datar) and trunc(:daten)
+
+	group by
+	br.RESOURCE_ID,
+	br.RESOURCE_NAME
+	  
+	order by sum(1) desc)]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet 7">
+         <sql fixedSchema="false">
+            <![CDATA[/*Number of new clients*/
+select
+count(*) newclients
+from
+	(
+	select
+	'('||c.card_id||') '||c.last_name||' '||c.FIRST_NAME||' '||second_name fio,
+	sum(1) sums
+	from bookings b, booking_resources br, cards c
+	where b.doc_id is not null
+	and b.status <> 'V'
+	and b.booking_id=br.booking_id
+	and br.RESOURCE_TYPE='P'
+	and br.RESOURCE_ID = c.card_id
+	and trunc(b.time_start) between trunc(:datar) and trunc(:daten)
+	group by 
+	'('||c.card_id||') '||c.last_name||' '||c.FIRST_NAME||' '||second_name
+
+	order by sum(1) desc
+	)
+where sums = 1]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="DataSet 8">
+         <sql fixedSchema="false">
+            <![CDATA[/*Number of regular clients*/
+select
+count(*) regularclients
+from
+	(
+	select
+	'('||c.card_id||') '||c.last_name||' '||c.FIRST_NAME||' '||second_name fio,
+	sum(1) sums
+	from bookings b, booking_resources br, cards c
+	where b.doc_id is not null
+	and b.status <> 'V'
+	and b.booking_id=br.booking_id
+	and br.RESOURCE_TYPE='P'
+	and br.RESOURCE_ID = c.card_id
+	and trunc(b.time_start) between trunc(:datar) and trunc(:daten)
+	group by 
+	'('||c.card_id||') '||c.last_name||' '||c.FIRST_NAME||' '||second_name
+
+	order by sum(1) desc
+	)
+where sums > 1]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+               <DataSet_1>
+                  <nodeList dataSet="DataSet 1" select="/ROWSET/DATASET_1_ROW"/>
+               </DataSet_1>
+               <DataSet_2>
+                  <nodeList dataSet="DataSet 2" select="/ROWSET/DATASET_2_ROW"/>
+               </DataSet_2>
+               <DataSet_3>
+                  <nodeList dataSet="DataSet 3" select="/ROWSET/DATASET_3_ROW"/>
+               </DataSet_3>
+               <DataSet_4>
+                  <nodeList dataSet="DataSet 4" select="/ROWSET/DATASET_4_ROW"/>
+               </DataSet_4>
+               <DataSet_5>
+                  <nodeList dataSet="DataSet 5" select="/ROWSET/DATASET_5_ROW"/>
+               </DataSet_5>
+               <DataSet_6>
+                  <nodeList dataSet="DataSet 6" select="/ROWSET/DATASET_6_ROW"/>
+               </DataSet_6>
+               <DataSet_7>
+                  <nodeList dataSet="DataSet 7" select="/ROWSET/DATASET_7_ROW"/>
+               </DataSet_7>
+               <DataSet_8>
+                  <nodeList dataSet="DataSet 8" select="/ROWSET/DATASET_8_ROW"/>
+               </DataSet_8>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="StatisticsEn">
+      <template label="StatisticsEn" type="rtf" url="StatisticsEn.rtf"/>
+      <template label="StatisticsRu" type="rtf" url="StatisticsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

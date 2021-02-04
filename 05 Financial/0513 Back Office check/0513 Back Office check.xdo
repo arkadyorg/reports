@@ -1,0 +1,386 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0513 Back Office check</title>
+   <description>HRS TNG3 report 0513 Back Office check</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+	r.pos_rvc rvc_id,		                     -- 1 RVC
+	r.name rvc_name,                                             -- 2 RVC name
+	d.chknum check_number,                                  -- 3 check number
+	d.tm ch_opdate,                        -- 4 check open date
+	d.tm ch_optime,                        -- 5 check open time
+	d.tm ch_cldate,                        -- 6 check close date
+	d.tm ch_cltime,                        -- 7 check close time
+	to_char(nvl(msi.si_id,dd.si)) si_id ,                     -- 8 sales group id
+	to_char(msi.name) si_name,                                           -- 9 sales group name
+	to_char(nvl(mfg.fgrp_id,dd.fgrp)) fgrp_id ,                 -- 10 family group
+	to_char(mfg.name) fgrp_name ,                                          -- 11 family group
+	nvl(dd.mi_id, dd.mi_id) mi_id,                            -- 12 menu item id
+	to_char(nvl(m.name1, dd.name)) name1,                              -- 13 menu item name 1
+	to_char(m.name2) name2,                                            -- 14 menu item name 2
+	dd.count counr,                                  -- 15 items count
+	(case when dd.count = 0 then dd.ttl else (round((dd.ttl)/dd.count,2)) end) item_price,  -- 16 item price
+	round(dd.ttl - dd.dsc + dd.manual_svc,2) item_ttl,           					-- 17 item total with disc/svc and with VAT
+	round((dd.ttl - dd.dsc + dd.manual_svc - round(dd.TAX_ADDON,2)),2) itemttl_novat, 	-- 18 item total with out VAT
+	dd.TAX_ADDON tax,		     -- 19 VAT amount
+	dd.dsc discountttl ,                                    -- 21 discount total
+	d.operator operatr ,                                        -- 22 cashier
+	dd.tax_addon tax2 ,                                      -- 23 tax
+	dd.dsc dsc,                                             -- 24 automatic discount svc
+	dd.manual_dsc man_dsc ,                                     -- 25 manual discount
+	dd.manual_svc man_svc ,                                     -- 26 manual svc
+	d.bussines_date bd,              -- 27 business date
+	d.check_open ,                                      -- 28 check status open=true closed=false
+	d.def_card_id ,                                     -- 29 profile id
+	(select ct.type_name from card_types ct, cards c where ct.card_type_id = c.card_type_id and c.card_id = d.def_card_id) card_type 	-- 32 card type
+
+from docs_dtl dd, docs d, menu_items m, menu_fgrp mfg, menu_si msi, rvc r
+
+where d.doc_id = dd.doc_id
+	and m.code(+) = dd.mi_id
+	and mfg.fgrp_id(+) = m.fgrp
+	and msi.si_id(+) = m.si
+	and r.rvc_id=d.rvc
+	and d.cofirmation='T'
+	and d.check_open='F'
+    and r.site_id in (:site_list)
+	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten) 
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+
+union all
+
+select
+	r.pos_rvc  rvc_id, 		                     -- 1 RVC
+	r.name rvc_name,                                              -- 2 RVC name
+	d.chknum check_number,                                   -- 3 check number
+	d.tm ch_opdate,                        -- 4 check open date
+	d.tm ch_optime,                         -- 5 check open time
+	d.tm ch_cldate,                         -- 6 check close date
+	d.tm ch_cltime,                          -- 7 check close time
+	' ' si_id,   		                                     -- 8 sales group id
+	'Loan' si_name ,   	                                     -- 9 sales group name
+	' ' fgrp_id	,	                                     -- 10 family group
+	' ' fgrp_name,                                                  -- 11 family group
+	' ' mi_id,                                                  -- 12 menu item id
+	'Loan' name1,                                              -- 13 menu item name 1
+	' ' name2 ,                                                 -- 14 menu item name 2
+	1 counr,   		                                     -- 15 items count
+	d.ttl item_price,            -- 16 item price
+	d.ttl item_ttl,           -- 17 item total with disc/svc and with VAT
+	d.ttl itemttl_novat,	     -- 18 item total with out VAT
+	0 tax,						     -- 19 VAT amount
+	0 discountttl, 		                                     -- 21 discount total
+	d.operator operatr ,                                         -- 22 cashier
+	0 tax2 ,                                                -- 23 tax
+	0 dsc   ,                                              -- 24 automatic discount svc
+	0 man_dsc,                                                 -- 25 manual discount
+	0 man_svc ,  		                                     -- 26 manual svc
+	d.bussines_date bd ,              -- 27 business date
+	d.check_open check_open,                                        -- 28 check status open=true closed=false
+	d.def_card_id def_card_id ,                                      -- 29 profile id
+	(select ct.type_name from card_types ct, cards c where ct.card_type_id = c.card_type_id and c.card_id = d.def_card_id) card_type	-- 32 card type
+
+from docs d, rvc r
+
+where
+	r.rvc_id=d.rvc
+    and r.site_id in (:site_list)
+	and d.cofirmation='T'
+	and d.check_open='F'
+	and d.doc_type='D'
+	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))]]>
+         </sql>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="DataSet2">
+         <sql fixedSchema="false">
+            <![CDATA[select --avg
+	to_char(r.pos_rvc) rvc_id, 		                -- 1 RVC
+	r.name rvc_name,                                         -- 2 RVC name
+	to_char(d.chknum) check_num,                              -- 3 check number
+	d.tm ch_opdate ,                    -- 4 check open date
+	d.tm ch_optime ,                    -- 5 check open time
+	d.tm ch_cldate,                    -- 6 check close date
+	d.tm ch_cltime,                    -- 7 check close time
+	to_char(dp.paym_seq) paym_seq,				-- 8 payment sequence in check
+	to_char(dp.tm_id) tm_id,				-- 9 tender media number
+	to_char(dp.tm_name) tm_name,				-- 10 tender media name
+	dp.posting_tm posting_tm,           -- 11 payment posting time
+	to_char(dp.cashier_id) cashier_id,				-- 12 cashier id
+	to_char(dp.reference) rference,				-- 13 payment reference
+	to_char(dp.void_flag) void_flag,				-- 14 void flag
+	to_char(dp.void_reference) void_reference,			-- 15 void reference
+	to_char(dp.currency_id) currency_id,			-- 16 currency id
+	to_char(dp.cashier_shift_id) cashier_shift_id,			-- 17 cashier shift id
+	d.operator operatr,                                     -- 18 cashier
+	d.bussines_date bussines_date,          -- 19 business date
+	d.check_open check_open,                                   -- 20 check status open=true closed=false
+	d.def_card_id def_card_id,                                  -- 21 profile id
+	dp.amount pay_amount,		-- 24 payment amount
+	dp.currency_amount currency_amount,	-- 25 payment amount in foreign currency
+	(select ct.type_name from card_types ct, cards c where ct.card_type_id = c.card_type_id and c.card_id = d.def_card_id) card_type,		-- 27 card type
+	(select i.invoice_number from invoice i where i.invoice_id = d.invoice_id and i.card_id = d.def_card_id) inv_number,			-- 28 invoice number
+	'Checks' type
+
+from docs d, docs_paym dp, rvc r
+
+where d.doc_id = dp.doc_id
+	and r.rvc_id=d.rvc
+	and d.cofirmation='T'
+	and d.check_open ='F'
+	and dp.amount <> 0
+    and r.site_id in (:site_list)
+	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+
+--subscr
+
+union all
+
+select
+	to_char(r.pos_rvc) rvc_id, 		                -- 1 RVC
+	r.name rvc_name,                                         -- 2 RVC name
+	to_char(d.chknum) check_num,                              -- 3 check number
+	d.tm ch_opdate,                    -- 4 check open date
+	d.tm ch_optime,                    -- 5 check open time
+	d.tm ch_cldate,                    -- 6 check close date
+	d.tm ch_cltime,                    -- 7 check close time
+	to_char(0) paym_seq,						-- 8 payment sequence in check
+	to_char(0) tm_id,						-- 9 tender media number
+	'Subscription' tm_name,					-- 10 tender media name
+	d.tm posting_tm, 		        -- 11 payment posting time
+	to_char(0) cashier_id,						-- 12 cashier id
+	'Subscrition Redemption' rference,			-- 13 payment reference
+	'' void_flag,						-- 14 void flag
+	'' void_reference,						-- 15 void reference
+	'' currency_id,						-- 16 currency id
+	'' cashier_shift_id,						-- 17 cashier shift id
+	d.operator operatr,                                     -- 18 cashier
+	d.bussines_date bussines_date,          -- 19 business date
+	d.check_open check_open,                                   -- 20 check status open=true closed=false
+	d.def_card_id def_card_id,                                  -- 21 profile id
+	dd.PAY_TTL_SUBSCR pay_amount,	-- 24 payment amount
+	dd.PAY_TTL_SUBSCR currency_amount,	-- 25 payment amount in foreign currency
+	(select ct.type_name from card_types ct, cards c where ct.card_type_id = c.card_type_id and c.card_id = d.def_card_id) card_type,		-- 27 card type
+	(select i.invoice_number from invoice i where i.invoice_id = d.invoice_id and i.card_id = d.def_card_id) inv_number,			-- 28 invoice number
+	'Subscriptions' type
+
+from docs d, docs_dtl dd, rvc r
+
+where d.doc_id = dd.doc_id
+	and r.rvc_id=d.rvc
+	and d.cofirmation='T'
+	and d.check_open='F'
+    and r.site_id in (:site_list)
+	and dd.PAY_TTL_SUBSCR<>0
+	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+
+--loan
+
+union all
+
+select
+	to_char(r.pos_rvc) rvc_id,		                -- 1 RVC
+	r.name rvc_name,                                        -- 2 RVC name
+	to_char(d.chknum) check_num,                             -- 3 check number
+	d.tm ch_opdate ,                   -- 4 check open date
+	d.tm ch_optime,                   -- 5 check open time
+	d.tm ch_cldate,                   -- 6 check close date
+	d.tm ch_cltime,                   -- 7 check close time
+	to_char(0) paym_seq ,						-- 8 payment sequence in check
+	to_char(0) tm_id ,						-- 9 tender media number
+	'Loan' tm_name,						-- 10 tender media name
+	d.tm posting_tm, 		        -- 11 payment posting time
+	to_char(0) cashier_id ,						-- 12 cashier id
+	'Loan' rference,						-- 13 payment reference
+	'' void_flag,						-- 14 void flag
+	'' void_reference,						-- 15 void reference
+	'' currency_id,						-- 16 currency id
+	'' cashier_shift_id,						-- 17 cashier shift id
+	d.operator operatr,                                    -- 18 cashier
+	d.bussines_date bussines_date,         -- 19 business date
+	d.check_open check_open,                                  -- 20 check status open=true closed=false
+	d.def_card_id def_card_id,                                 -- 21 profile id
+	d.ttl pay_amount,		-- 24 payment amount
+	d.ttl currency_amount,		-- 25 payment amount in foreign currency
+	(select ct.type_name from card_types ct, cards c where ct.card_type_id = c.card_type_id and c.card_id = d.def_card_id) card_type,		-- 27 card type
+	(select i.invoice_number from invoice i where i.invoice_id = d.invoice_id and i.card_id = d.def_card_id) inv_number,			-- 28 invoice number
+	'Loans' type
+
+from docs d, rvc r
+
+where 
+	r.rvc_id=d.rvc
+	and d.cofirmation='T'
+	and d.check_open='F'
+	and d.doc_type='M'
+    and r.site_id in (:site_list)
+	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))
+
+union all
+
+------------------------------------------------------------------------------
+-- Bonus triggers checks
+------------------------------------------------------------------------------
+
+select
+	to_char(r.pos_rvc) rvc_id, 		                -- 1 RVC
+	r.name rvc_name,                                         -- 2 RVC name
+  to_char(d.chknum) check_num,                             -- 3 check number
+	d.tm ch_opdate ,                   -- 4 check open date
+	d.tm ch_optime,                   -- 5 check open time
+	d.tm ch_cldate,                   -- 6 check close date
+	d.tm ch_cltime,                   -- 7 check close time
+	to_char(0) paym_seq ,						-- 8 payment sequence in check
+	to_char(0) tm_id ,						-- 9 tender media number
+	'Loan' tm_name,						-- 10 tender media name
+	d.tm posting_tm, 		        -- 11 payment posting time
+	to_char(0) cashier_id ,						-- 12 cashier id
+	'Loan' rference,						-- 13 payment reference
+	'' void_flag,						-- 14 void flag
+	'' void_reference,						-- 15 void reference
+	'' currency_id,						-- 16 currency id
+	'' cashier_shift_id,						-- 17 cashier shift id
+	d.operator operatr,                                    -- 18 cashier
+	d.bussines_date bussines_date,         -- 19 business date
+	d.check_open check_open,                                  -- 20 check status open=true closed=false
+	d.def_card_id def_card_id,                                 -- 21 profile id
+	d.ttl pay_amount,		-- 24 payment amount
+	d.ttl currency_amount,		-- 25 payment amount in foreign currency
+	(select ct.type_name from card_types ct, cards c where ct.card_type_id = c.card_type_id and c.card_id = d.def_card_id) card_type,		-- 27 card type
+	(select i.invoice_number from invoice i where i.invoice_id = d.invoice_id and i.card_id = d.def_card_id) inv_number,			-- 28 invoice number
+	'Bonus triggers' type
+
+from docs d, rvc r, accounting a
+
+where 
+	r.rvc_id=d.rvc
+	and d.cofirmation='T'
+	and d.check_open='F'
+	and d.doc_type='A'
+	and d.rvc = 0
+	and d.operator = 'system'
+	and a.doc_id = d.doc_id
+	and a.account_def_id in (:accparam)
+	and a.amount <> 0
+    and r.site_id in (:site_list)
+  	and trunc(d.BUSSINES_DATE) between trunc(:datar) and trunc(:daten)
+	and (:rvcgroup is null or d.rvc in (select rvc_id from rvc_group_link where rvc_group_id=:rvcgroup))
+	and (:rvcid is null or d.rvc in (select rvc_id from rvc where rvc_id=:rvcid))]]>
+         </sql>
+         <input id="site_list" value="${site_list}" dataType="xsd:string"/>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+         <input id="accparam" value="${accparam}" dataType="xsd:string"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:datar) datar,
+(:daten) daten,
+nvl((select name from rvc_group where rvc_group_id = (:rvcgroup)),'All') rgroup,
+nvl((select name from rvc where rvc_id = (:rvcid)),'All') rvc
+from dual]]>
+         </sql>
+         <input id="datar" value="${datar}" dataType="xsd:date"/>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+         <input id="rvcgroup" value="${rvcgroup}" dataType="xsd:integer"/>
+         <input id="rvcid" value="${rvcid}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <DataSet2>
+                  <nodeList dataSet="DataSet2" select="/ROWSET/DATASET2_ROW"/>
+               </DataSet2>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="rvcgr">
+         <sql>
+            <![CDATA[select name, rvc_group_id as rvrcgroup from rvc_group
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="rvc">
+         <sql>
+            <![CDATA[select name, rvc_id as rvcid from rvc
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="acc">
+         <sql>
+            <![CDATA[select
+ad.name, ad.ACCOUNT_DEF_ID
+from ACCOUNT_DEF ad]]>
+         </sql>
+      </valueSet>
+      <valueSet id="sites">
+         <sql>
+            <![CDATA[select
+s.name,
+s.site_id
+from sites s]]>
+         </sql>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="site_list">
+         <select label="Site:" valueSet="sites" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+      <parameter id="rvcgroup" dataType="xsd:integer">
+         <select label="RVC group: " valueSet="rvcgr" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="rvcid" dataType="xsd:integer">
+         <select label="RVC: " valueSet="rvc" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+      <parameter id="accparam">
+         <select label="Account: " valueSet="acc" multiple="false" all="true" allValue="lov"/>
+      </parameter>
+   </parameters>
+   <templates default="BO check En">
+      <template label="BO check En" type="rtf" url="backofficecheckEn.rtf"/>
+      <template label="BO check Ru" type="rtf" url="backofficecheckRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

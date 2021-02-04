@@ -1,0 +1,75 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0510 Instalment due payments</title>
+   <description>HRS TNG3 report 0510 Instalment due payments</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select
+1 co,
+a.card_id,
+c.LAST_NAME,
+c.FIRST_NAME,
+a.amount,
+ab.LOAN,
+a.EXPIRY_DATE expdateraw,
+to_char(a.EXPIRY_DATE,'MONTH') month,
+to_char(a.EXPIRY_DATE,'yyyy') year,
+mi.name1 subname
+
+from accounting a, cards c, SUBSCRIPTION_ACCOUNTING sa, menu_items mi, accounting_balance ab
+
+where a.loan_flag = 'T'
+and trunc(a.EXPIRY_DATE) between trunc(sysdate) and trunc(:daten)
+and a.card_id = c.card_id
+and a.SUBSCRIPTION_ACCOUNTING_ID=sa.SUBSCRIPTION_ACCOUNTING_ID
+and sa.subscription_mi_id=mi.mi_id
+and c.card_id = ab.CARD_ID
+and ab.SA_FLAG=1]]>
+         </sql>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="paramset">
+         <sql fixedSchema="false">
+            <![CDATA[select
+(:daten) daten
+from dual]]>
+         </sql>
+         <input id="daten" value="${daten}" dataType="xsd:date"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <paramset>
+                  <nodeList dataSet="paramset" select="/ROWSET/PARAMSET_ROW"/>
+               </paramset>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets/>
+   <parameters>
+      <parameter id="datar" defaultValue="{$sysdate()$}" dataType="xsd:date"/>
+      <parameter id="daten" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yyyy"/>
+      </parameter>
+   </parameters>
+   <templates default="instaDuePaymantsEn">
+      <template label="instaDuePaymantsEn" type="rtf" url="instaDuePaymentsEn.rtf"/>
+      <template label="instaDuePaymentsRu" type="rtf" url="instaDuePaymentsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>

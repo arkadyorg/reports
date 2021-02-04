@@ -1,0 +1,232 @@
+<?xml version = '1.0' encoding = 'utf-8'?>
+<report xmlns="http://xmlns.oracle.com/oxp/xmlp" version="1.1" defaultDataSourceRef="CLUB">
+   <title>0804 Store amounts</title>
+   <description>HRS TNG3 report 0804 Store amounts</description>
+   <properties>
+      <property name="showControls" value="true"/>
+      <property name="showReportLinks" value="true"/>
+      <property name="online" value="true"/>
+      <property name="parameterColumns" value="3"/>
+      <property name="openLinkInNewWindow" value="true"/>
+      <property name="autoRun" value="false"/>
+      <property name="cacheDocument" value="false"/>
+      <property name="useExcelProcessor" value="false"/>
+   </properties>
+   <dataModel defaultDataSet="merged-dataset">
+      <dataSet id="DataSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+  h2.name || ' - ' || h1.name as folder,
+  ins.inv_store_id,
+  ins.name as StoreName,
+  si.name as NameSI,
+  fgrp.name as NameFgrp,
+  mi.code as mi_id,
+  mi.favourites_id as FavouritesItem,
+  mi.name1 as NameItem,
+  mi.barcode as BarcodeItem,
+  NVL((select price from menu_price where ordr=0 and mi_id=mi.mi_id), 0) as MenuPrice,
+  rem.amount_begin as InvAmountStart,
+  rem.amount_end as InvAmountEnd,
+  rem.amount_end as InvAmount,
+  NVL(mi.cost, 0) as CostItem, 
+  NVL(mi.rsrv_count, 0) as RsrvItem,
+  NVL(mi.cost, 0) * rem.amount_end / iu.unit_wgt as SumCost,
+  iubase.name as unitbase,
+  iu.name as unit,
+  (rem.amount_begin + rem.amount_end) movement,
+  rem.ups as ups,
+  rem.redemptions*(-1) as redemptions
+from
+  (
+  select mi_id, store_id, sum(amount_begin) as amount_begin, sum(amount_end) as amount_end, sum(ups) as ups, sum(redemptions) redemptions
+  from (
+    select idtl.mi_id, idoc.dst_store_id as store_id, sum(idtl.amount) as amount_begin, 0 as amount_end, 0 as ups, 0 as redemptions
+    from inv_docs_dtl idtl, inv_docs idoc
+    where idtl.inv_docs_id = idoc.inv_docs_id
+    and idoc.dst_store_id is not null
+    and idoc.confirmation=1
+    and trunc(idoc.date_tm) < cast(:dStart as date)
+    group by idtl.mi_id, idoc.dst_store_id
+    union all
+    select idtl.mi_id, idoc.src_store_id as store_id, sum(idtl.amount)*-1 as amount_begin, 0 as amount_end, 0 as ups, 0 as redemptions
+    from inv_docs_dtl idtl, inv_docs idoc
+    where idtl.inv_docs_id = idoc.inv_docs_id
+    and idoc.src_store_id is not null
+    and idoc.confirmation=1
+    and trunc(idoc.date_tm) < cast(:dStart as date)
+    group by idtl.mi_id, idoc.src_store_id
+    union all
+    select idtl.mi_id, idoc.dst_store_id as store_id, 0 as amount_begin, sum(idtl.amount) as amount_end, 0 as ups, 0 as redemptions
+    from inv_docs_dtl idtl, inv_docs idoc
+    where idtl.inv_docs_id = idoc.inv_docs_id
+    and idoc.dst_store_id is not null
+    and idoc.confirmation=1
+    and trunc(idoc.date_tm) <= cast(:dEnd as date)
+    group by idtl.mi_id, idoc.dst_store_id
+
+    union all
+    select idtl.mi_id, idoc.src_store_id as store_id, 0 as amount_begin, sum(idtl.amount)*-1 as amount_end, 0 as ups, 0 as redemptions
+    from inv_docs_dtl idtl, inv_docs idoc
+    where idtl.inv_docs_id = idoc.inv_docs_id
+    and idoc.src_store_id is not null
+    and idoc.confirmation=1
+    and trunc(idoc.date_tm) <= cast(:dEnd as date)
+    group by idtl.mi_id, idoc.src_store_id
+
+    union all
+    select
+    idtl.mi_id, idoc.DST_STORE_ID as store_id, 0 as amount_begin, 0 as amount_end, sum(idtl.amount) ups, 0 as redemptions
+    from inv_docs idoc, inv_docs_dtl idtl
+    where idoc.inv_docs_id = idtl.inv_docs_id
+    and idoc.confirmation=1
+    and trunc(idoc.date_tm) between trunc(:dStart) and trunc(:dEnd)
+    and idoc.booking_id is null and idoc.doc_id is null --and idoc.src_store_id is null
+    group by idtl.mi_id, idoc.DST_STORE_ID
+
+    union all
+    select
+    idtl.mi_id, idoc.src_store_id as store_id, 0 as amount_begin, 0 as amount_end, 0 ups, sum(idtl.amount) redemptions
+    from inv_docs idoc, inv_docs_dtl idtl
+    where idoc.inv_docs_id = idtl.inv_docs_id
+    and idoc.confirmation=1
+    and trunc(idoc.date_tm) between trunc(:dStart) and trunc(:dEnd)
+    and idoc.src_store_id is not null
+    group by idtl.mi_id, idoc.src_store_id
+  )
+  group by  mi_id, store_id
+  order by mi_id
+  ) rem,
+  menu_items mi,
+  menu_si si,
+  menu_fgrp fgrp,
+  dictionary_hierarchy h1,
+  dictionary_hierarchy h2,
+  inv_units iu,
+  inv_units_base iubase,
+  inv_store ins
+where
+  rem.mi_id = mi.mi_id
+  and si.si_id = mi.si
+  and fgrp.fgrp_id = mi.fgrp
+  and h1.hierarchy_id = mi.hierarchy_id
+  and h2.hierarchy_id = h1.parent_id
+  and ins.inv_store_id = rem.store_id
+  and iu.inv_unit_id = mi.base_inv_unit_id
+  and iubase.inv_units_base_id = iu.inv_units_base_id
+  and (:InvStore is null or ins.inv_store_id = :InvStore)
+  and (:InMenuSI is null or si.si_id = :InMenuSI )
+  and (:InMenuFgrp is null or fgrp.fgrp_id = :InMenuFgrp)
+  and (:sel_hier is null or :sel_hier = mi.hierarchy_id)
+  and (:zerorem is null or rem.amount_begin <> 0 or rem.amount_end <> 0)]]>
+         </sql>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+         <input id="InvStore" value="${InvStore}" dataType="xsd:integer"/>
+         <input id="InMenuSI" value="${InMenuSI}" dataType="xsd:integer"/>
+         <input id="InMenuFgrp" value="${InMenuFgrp}" dataType="xsd:integer"/>
+         <input id="sel_hier" value="${sel_hier}" dataType="xsd:integer"/>
+         <input id="zerorem" value="${zerorem}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="ParamSet">
+         <sql fixedSchema="false">
+            <![CDATA[select 
+TO_CHAR(SYSDATE, 'DD.MM.YYYY HH24:MI') as print_date,
+TO_CHAR(:dStart, 'DD.MM.YYYY') as report_start,
+TO_CHAR(:dEnd, 'DD.MM.YYYY') as report_end,
+nvl((select name from inv_store where INV_STORE_ID = (:InvStore)),'All') InvStore,
+nvl((select name from MENU_SI where si_id= (:InMenuSI)),'All') InMenuSI,
+nvl((select name from MENU_FGRP where fgrp_id= (:InMenuFgrp)),'All') InMenuFgrp
+
+from dual]]>
+         </sql>
+         <input id="dStart" value="${dStart}" dataType="xsd:date"/>
+         <input id="dEnd" value="${dEnd}" dataType="xsd:date"/>
+         <input id="InvStore" value="${InvStore}" dataType="xsd:integer"/>
+         <input id="InMenuSI" value="${InMenuSI}" dataType="xsd:integer"/>
+         <input id="InMenuFgrp" value="${InMenuFgrp}" dataType="xsd:integer"/>
+      </dataSet>
+      <dataSet id="merged-dataset">
+         <concatenate uniqueRowName="true">
+            <DATA>
+               <DataSet>
+                  <nodeList dataSet="DataSet" select="/ROWSET/DATASET_ROW"/>
+               </DataSet>
+               <ParamSet>
+                  <nodeList dataSet="ParamSet" select="/ROWSET/PARAMSET_ROW"/>
+               </ParamSet>
+            </DATA>
+         </concatenate>
+      </dataSet>
+   </dataModel>
+   <valueSets>
+      <valueSet id="New List of Value 1">
+         <sql>
+            <![CDATA[select name, inv_store_id from inv_store
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="New List of Value 2">
+         <sql>
+            <![CDATA[select name, si_id from menu_si
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="New List of Value 3">
+         <sql>
+            <![CDATA[select name, fgrp_id from menu_fgrp
+order by name]]>
+         </sql>
+      </valueSet>
+      <valueSet id="folders">
+         <sql>
+            <![CDATA[select  
+((select h1.name || ' - ' || h2.name from dictionary_hierarchy h1, dictionary_hierarchy h2
+where h2.hierarchy_id=dict.parent_id and h1.hierarchy_id=h2.parent_id
+) || ' - ' || dict.name || 
+' (' || (select count(*) from menu_items 
+where hierarchy_id=dict.hierarchy_id and mi_type=7) || ')') as folder,
+dict.hierarchy_id as sel_hier
+from dictionary_hierarchy dict
+where 
+dict.hierarchy_id 
+  in (select distinct(hierarchy_id) 
+  from menu_items where mi_type=7)
+order by folder]]>
+         </sql>
+      </valueSet>
+      <valueSet id="Zero remains">
+         <nvPairs>
+            <nvPair label="Not zero" value="1"/>
+         </nvPairs>
+      </valueSet>
+   </valueSets>
+   <parameters>
+      <parameter id="dStart" defaultValue="{$FIRST_DAY_OF_MONTH()$}" dataType="xsd:date">
+         <date label="From date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="dEnd" defaultValue="{$sysdate()$}" dataType="xsd:date">
+         <date label="To date: " format="dd.MM.yy"/>
+      </parameter>
+      <parameter id="InvStore" dataType="xsd:integer">
+         <select label="Store: " valueSet="New List of Value 1" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="InMenuSI" dataType="xsd:integer">
+         <select label="Menu group: " valueSet="New List of Value 2" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="InMenuFgrp" dataType="xsd:integer">
+         <select label="Menu family group: " valueSet="New List of Value 3" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="sel_hier" dataType="xsd:integer">
+         <select label="Folder: " valueSet="folders" multiple="false" all="true" allValue="null"/>
+      </parameter>
+      <parameter id="zerorem" dataType="xsd:integer">
+         <select label="Remains: " valueSet="Zero remains" multiple="false" all="true" allValue="null"/>
+      </parameter>
+   </parameters>
+   <templates default="By store name EN">
+      <template label="By store name EN" type="rtf" url="storeAmountsEn.rtf"/>
+      <template label="By store name RU" type="rtf" url="storeAmountsRu.rtf"/>
+   </templates>
+   <burst enabled="false"/>
+</report>
